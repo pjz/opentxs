@@ -5,7 +5,6 @@
 
 #include "stdafx.hpp"
 
-#include "opentxs/core/Identifier.hpp"
 #include "opentxs/core/Log.hpp"
 #include "opentxs/network/zeromq/Context.hpp"
 #include "opentxs/network/zeromq/Frame.hpp"
@@ -21,7 +20,6 @@
 
 #define CALLBACK_WAIT_MILLISECONDS 50
 #define POLL_MILLISECONDS 1000
-#define INPROC_PREFIX "inproc://opentxs/"
 
 #define OT_METHOD "opentxs::network::zeromq::implementation::Bidirectional::"
 
@@ -34,11 +32,9 @@ Bidirectional::Bidirectional(
     const bool startThread)
     : Receiver(lock, socket, false)
     , push_socket_{zmq_socket(context, ZMQ_PUSH)}
-    , endpoint_{INPROC_PREFIX}
+    , endpoint_{Socket::random_inproc_endpoint()}
     , pull_socket_{zmq_socket(context, ZMQ_PULL)}
 {
-    endpoint_.append(Identifier::Random()->str());
-
     OT_ASSERT(nullptr != pull_socket_);
     OT_ASSERT(nullptr != push_socket_);
 
@@ -95,7 +91,7 @@ bool Bidirectional::apply_timeouts(void* socket, std::mutex& socket_mutex) const
 bool Bidirectional::bind(
     void* socket,
     std::mutex& socket_mutex,
-    std::string& endpoint) const
+    const std::string& endpoint) const
 {
     apply_timeouts(socket, socket_mutex);
 
@@ -105,7 +101,7 @@ bool Bidirectional::bind(
 bool Bidirectional::connect(
     void* socket,
     std::mutex& socket_mutex,
-    std::string& endpoint) const
+    const std::string& endpoint) const
 {
     apply_timeouts(socket, socket_mutex);
 
@@ -162,7 +158,7 @@ bool Bidirectional::send(const Lock& lock, zeromq::Message& message)
 
 void Bidirectional::thread()
 {
-    otInfo << OT_METHOD << __FUNCTION__ << ": Starting listener" << std::endl;
+    LogVerbose(OT_METHOD)(__FUNCTION__)(": Starting listener").Flush();
 
     while (receiver_run_.get()) {
         if (have_callback()) { break; }
@@ -170,7 +166,7 @@ void Bidirectional::thread()
         Log::Sleep(std::chrono::milliseconds(CALLBACK_WAIT_MILLISECONDS));
     }
 
-    otInfo << OT_METHOD << __FUNCTION__ << ": Callback ready" << std::endl;
+    LogVerbose(OT_METHOD)(__FUNCTION__)(": Callback ready").Flush();
     zmq_pollitem_t poll[2];
 
     while (receiver_run_.get()) {
@@ -181,8 +177,7 @@ void Bidirectional::thread()
         const auto events = zmq_poll(poll, 2, POLL_MILLISECONDS);
 
         if (0 == events) {
-            otInfo << OT_METHOD << __FUNCTION__ << ": No messages."
-                   << std::endl;
+            LogVerbose(OT_METHOD)(__FUNCTION__)(": No messages.").Flush();
 
             continue;
         }
@@ -207,7 +202,7 @@ void Bidirectional::thread()
         if (false == processed) { return; }
     }
 
-    otInfo << OT_METHOD << __FUNCTION__ << ": Shutting down" << std::endl;
+    LogVerbose(OT_METHOD)(__FUNCTION__)(": Shutting down").Flush();
 }
 
 Bidirectional::~Bidirectional() {}
