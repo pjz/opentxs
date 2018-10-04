@@ -125,9 +125,9 @@ bool SwigWrap::AppCleanup()
 // if you override AppBinary folder to, say, "res/raw"
 // (Android does something like that) then even though the prefix remains
 // as /usr/local, the scripts folder will be res/raw
-void SwigWrap::SetAppBinaryFolder(const std::string& strFolder)
+void SwigWrap::SetAppBinaryFolder(const std::string& strLocation)
 {
-    OTAPI_Exec::SetAppBinaryFolder(strFolder.c_str());
+    OTAPI_Exec::SetAppBinaryFolder(strLocation);
 }
 
 // SetHomeFolder
@@ -143,9 +143,9 @@ void SwigWrap::SetAppBinaryFolder(const std::string& strFolder)
 // In Android, you would SetAppBinaryFolder to the path to
 // "/data/app/packagename/res/raw",
 // and you would SetHomeFolder to "/data/data/[app package]/files/"
-void SwigWrap::SetHomeFolder(const std::string& strFolder)
+void SwigWrap::SetHomeFolder(const std::string& strLocation)
 {
-    OTAPI_Exec::SetHomeFolder(strFolder.c_str());
+    OTAPI_Exec::SetHomeFolder(strLocation);
 }
 
 std::int64_t SwigWrap::StringToLong(const std::string& strNumber)
@@ -2737,10 +2737,10 @@ std::string SwigWrap::GetContactSections(const std::uint32_t version)
 
     for (const auto& it : data) { list.Add(it); }
 
-    String output;
+    auto output = String::Factory();
     list.Output(output);
 
-    return output.Get();
+    return output->Get();
 }
 
 std::string SwigWrap::GetContactSectionName(
@@ -2761,10 +2761,10 @@ std::string SwigWrap::GetContactSectionTypes(
 
     for (const auto& it : data) { list.Add(it); }
 
-    String output;
+    auto output = String::Factory();
     list.Output(output);
 
-    return output.Get();
+    return output->Get();
 }
 
 std::string SwigWrap::GetContactTypeName(
@@ -2976,8 +2976,9 @@ std::string SwigWrap::Blockchain_Account_List(
 {
     const auto nym = Identifier::Factory(nymID);
     const auto type = static_cast<proto::ContactItemType>(chain);
-    otInfo << OT_METHOD << __FUNCTION__ << ": Loading account list for "
-           << proto::TranslateItemType(type) << std::endl;
+    LogVerbose(OT_METHOD)(__FUNCTION__)(": Loading account list for ")(
+        proto::TranslateItemType(type))
+        .Flush();
     const auto output = client_->Blockchain().AccountList(nym, type);
 
     return comma(output);
@@ -3450,8 +3451,8 @@ std::string SwigWrap::Get_Introduction_Server()
 
 std::string SwigWrap::Import_Nym(const std::string& armored)
 {
-    const auto serialized =
-        proto::StringToProto<proto::CredentialIndex>(String(armored.c_str()));
+    const auto serialized = proto::StringToProto<proto::CredentialIndex>(
+        String::Factory(armored.c_str()));
     const auto nym = client_->Wallet().Nym(serialized);
 
     if (nym) { return nym->ID().str(); }
@@ -3563,8 +3564,8 @@ std::string SwigWrap::Send_Cheque(
 
 std::string SwigWrap::Set_Introduction_Server(const std::string& contract)
 {
-    const auto serialized =
-        proto::StringToProto<proto::ServerContract>(contract.c_str());
+    const auto serialized = proto::StringToProto<proto::ServerContract>(
+        String::Factory(contract.c_str()));
     const auto instantiated = client_->Wallet().Server(serialized);
 
     if (false == bool(instantiated)) { return {}; }

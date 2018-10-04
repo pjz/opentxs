@@ -5,11 +5,14 @@
 
 #include "stdafx.hpp"
 
+#include "Internal.hpp"
+
 #include "opentxs/consensus/ServerContext.hpp"
 
 #include "opentxs/api/Core.hpp"
 #include "opentxs/api/Factory.hpp"
 #include "opentxs/api/Wallet.hpp"
+#include "opentxs/consensus/ManagedNumber.hpp"
 #include "opentxs/consensus/TransactionStatement.hpp"
 #include "opentxs/core/Armored.hpp"
 #include "opentxs/core/Identifier.hpp"
@@ -20,6 +23,8 @@
 #include "opentxs/core/String.hpp"
 #include "opentxs/network/ServerConnection.hpp"
 
+#include "Factory.hpp"
+
 #define CURRENT_VERSION 2
 #define DEFAULT_NODE_NAME "Stash Node Pro"
 
@@ -28,46 +33,6 @@
 namespace opentxs
 {
 const std::string ServerContext::default_node_name_{DEFAULT_NODE_NAME};
-
-ServerContext::ManagedNumber::ManagedNumber(
-    const TransactionNumber number,
-    ServerContext& context)
-    : context_(context)
-    , number_(number)
-    , success_(Flag::Factory(false))
-    , managed_(0 != number)
-{
-}
-
-ServerContext::ManagedNumber::ManagedNumber(ManagedNumber&& rhs)
-    : context_(rhs.context_)
-    , number_(rhs.number_)
-    , success_(std::move(rhs.success_))
-    , managed_(rhs.managed_)
-{
-    rhs.managed_ = false;
-}
-
-ServerContext::ManagedNumber::operator TransactionNumber() const
-{
-    return number_;
-}
-
-void ServerContext::ManagedNumber::SetSuccess(const bool value) const
-{
-    success_->Set(value);
-}
-
-bool ServerContext::ManagedNumber::Valid() const { return managed_; }
-
-ServerContext::ManagedNumber::~ManagedNumber()
-{
-    if (false == managed_) { return; }
-
-    if (success_.get()) { return; }
-
-    context_.RecoverAvailableNumber(number_);
-}
 
 ServerContext::ServerContext(
     const api::Core& api,
@@ -326,7 +291,7 @@ std::pair<RequestNumber, std::unique_ptr<Message>> ServerContext::
     auto output = initialize_server_command(
         lock, type, provided, withAcknowledgments, withNymboxHash);
     auto& [requestNumber, message] = output;
-    const auto& notUsed[[maybe_unused]] = requestNumber;
+    const auto& notUsed [[maybe_unused]] = requestNumber;
 
     message->m_ascPayload = payload;
     message->m_strAcctID = String::Factory(accountID);
@@ -367,39 +332,38 @@ std::pair<RequestNumber, std::unique_ptr<Message>> ServerContext::
 
 bool ServerContext::isAdmin() const { return admin_success_.get(); }
 
-ServerContext::ManagedNumber ServerContext::NextTransactionNumber(
-    const MessageType reason)
+OTManagedNumber ServerContext::NextTransactionNumber(const MessageType reason)
 {
     Lock lock(lock_);
     const std::size_t reserve = (MessageType::processInbox == reason) ? 0 : 1;
 
     if (0 == reserve) {
-        otInfo << OT_METHOD << __FUNCTION__
-               << ": Allocating a transaction number for process inbox."
-               << std::endl;
+        LogVerbose(OT_METHOD)(__FUNCTION__)(
+            ": Allocating a transaction number for process inbox.")
+            .Flush();
     } else {
-        otInfo << OT_METHOD << __FUNCTION__
-               << ": Allocating a transaction number for normal transaction."
-               << std::endl;
+        LogVerbose(OT_METHOD)(__FUNCTION__)(
+            ": Allocating a transaction number for normal transaction.")
+            .Flush();
     }
 
-    otInfo << OT_METHOD << __FUNCTION__ << ": "
-           << available_transaction_numbers_.size() << " numbers available."
-           << std::endl;
-    otInfo << OT_METHOD << __FUNCTION__ << ": "
-           << issued_transaction_numbers_.size() << " numbers issued."
-           << std::endl;
+    LogVerbose(OT_METHOD)(__FUNCTION__)(": ")(
+        available_transaction_numbers_.size())(" numbers available.")
+        .Flush();
+    LogVerbose(OT_METHOD)(__FUNCTION__)(": ")(
+        issued_transaction_numbers_.size())(" numbers issued.")
+        .Flush();
 
     if (reserve >= available_transaction_numbers_.size()) {
 
-        return ManagedNumber(0, *this);
+        return OTManagedNumber(Factory::ManagedNumber(0, *this));
     }
 
     auto first = available_transaction_numbers_.begin();
     const auto output = *first;
     available_transaction_numbers_.erase(first);
 
-    return ManagedNumber(output, *this);
+    return OTManagedNumber(Factory::ManagedNumber(output, *this));
 }
 
 NetworkReplyMessage ServerContext::PingNotary()

@@ -4079,11 +4079,12 @@ std::string OTAPI_Exec::ProposePaymentPlan(
         // (Customer acct is unknown until confirmation by customer.)
         angelSenderAcctId.get(),
         Identifier::Factory(SENDER_NYM_ID),
-        PLAN_CONSIDERATION.empty() ? "(Consideration for the agreement between "
-                                     "the parties is meant to be recorded "
-                                     "here.)"
-                                   // Like a memo.
-                                   : String(PLAN_CONSIDERATION),
+        PLAN_CONSIDERATION.empty()
+            ? String::Factory("(Consideration for the agreement between "
+                              "the parties is meant to be recorded "
+                              "here.)")
+            // Like a memo.
+            : String::Factory(PLAN_CONSIDERATION),
         Identifier::Factory(RECIPIENT_ACCT_ID),
         Identifier::Factory(RECIPIENT_NYM_ID),
         static_cast<std::int64_t>(INITIAL_PAYMENT_AMOUNT),
@@ -9445,10 +9446,11 @@ std::string OTAPI_Exec::LoadPurse(
         ot_api_.LoadPurse(theNotaryID, theInstrumentDefinitionID, theNymID));
 
     if (nullptr == pPurse) {
-        otInfo << "OTAPI_Exec::LoadPurse() received null when called "
-                  "OT_API::LoadPurse(). Server: "
-               << NOTARY_ID << " Asset Type: " << INSTRUMENT_DEFINITION_ID
-               << "\n";
+        LogVerbose(OT_METHOD)(__FUNCTION__)(
+            "OTAPI_Exec::LoadPurse() received null when called ")(
+            "OT_API::LoadPurse(). Server: ")(NOTARY_ID)(" Asset Type: ")(
+            INSTRUMENT_DEFINITION_ID)
+            .Flush();
     } else  // success
     {
         auto strOutput = String::Factory(*pPurse);  // For the output
@@ -11361,14 +11363,15 @@ std::int32_t OTAPI_Exec::Message_GetSuccess(
         return OT_ERROR;
     }
     if (true == theMessage->m_bSuccess) {
-        otInfo << __FUNCTION__ << ": Server reply for RequestNum "
-               << StringToLong(theMessage->m_strRequestNum->Get())
-               << "(Message_GetSuccess was successful, but any transaction "
-                  "inside could have failed OR succeeded. Use "
-                  "Message_GetTransactionSuccess for that.)\n";  // Contents:
-                                                                 // \n\n" <<
-                                                                 // THE_MESSAGE
-                                                                 // << "\n\n"
+        LogVerbose(OT_METHOD)(__FUNCTION__)(": Server reply for RequestNum ")(
+            theMessage->m_strRequestNum)(
+            "(Message_GetSuccess was successful, but any transaction ")(
+            "inside could have failed OR succeeded. Use "
+            "Message_GetTransactionSuccess for that.)")
+            .Flush();  // Contents:
+                       // \n\n" <<
+                       // THE_MESSAGE
+                       // << "\n\n"
         return OT_TRUE;
     } else {
         otWarn << OT_METHOD << __FUNCTION__

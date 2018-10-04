@@ -48,7 +48,7 @@ ReplyMessage::ReplyMessage(
     message_.m_strRequestNum->Set(original_.m_strRequestNum);
     message_.m_strNotaryID->Set(original_.m_strNotaryID);
     message_.m_strNymID = original_.m_strNymID;
-    message_.m_strCommand = Message::ReplyCommand(type).c_str();
+    message_.m_strCommand->Set(Message::ReplyCommand(type).c_str());
     message_.m_bSuccess = false;
     attach_request();
     init_ = init();
@@ -92,8 +92,9 @@ void ReplyMessage::attach_request()
         case MessageType::getMarketList:
         case MessageType::requestAdmin:
         case MessageType::addClaim: {
-            otInfo << OT_METHOD << __FUNCTION__ << ": Attaching original "
-                   << command << " message." << std::endl;
+            LogVerbose(OT_METHOD)(__FUNCTION__)(": Attaching original ")(
+                command)(" message.")
+                .Flush();
             message_.m_ascInReferenceTo.SetString(String::Factory(original_));
         } break;
         case MessageType::pingNotary:
@@ -117,8 +118,9 @@ void ReplyMessage::clear_request()
         case MessageType::getAccountData:
         case MessageType::getInstrumentDefinition:
         case MessageType::getMint: {
-            otInfo << OT_METHOD << __FUNCTION__ << ": Clearing original "
-                   << command << " message." << std::endl;
+            LogVerbose(OT_METHOD)(__FUNCTION__)(": Clearing original ")(
+                command)(" message.")
+                .Flush();
             message_.m_ascInReferenceTo.Release();
         } break;
         case MessageType::getMarketOffers:

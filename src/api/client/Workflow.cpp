@@ -115,8 +115,8 @@ Workflow::Cheque Workflow::InstantiateCheque(
 
             if (serialized.empty()) { return output; }
 
-            const auto loaded =
-                cheque->LoadContractFromString(serialized.c_str());
+            const auto loaded = cheque->LoadContractFromString(
+                String::Factory(serialized.c_str()));
 
             if (false == loaded) {
                 otErr << OT_METHOD << __FUNCTION__
@@ -220,7 +220,7 @@ bool Workflow::add_cheque_event(
     event.set_success(success);
 
     if (haveReply) {
-        event.add_item(String(*reply).Get());
+        event.add_item(String::Factory(*reply)->Get());
         event.set_time(reply->m_lTime);
     } else {
         event.set_time(request.m_lTime);
@@ -247,7 +247,7 @@ bool Workflow::add_cheque_event(
     auto& event = *(workflow.add_event());
     event.set_version(version);
     event.set_type(newEventType);
-    event.add_item(String(message).Get());
+    event.add_item(message->Get());
     event.set_time(std::chrono::system_clock::to_time_t(time));
     event.set_method(proto::TRANSPORTMETHOD_OT);
     event.set_transport(receipt.GetRealNotaryID().str());
@@ -489,8 +489,8 @@ bool Workflow::ClearCheque(
         cheque->GetRecipientNymID().str(),
         cheque->SourceAccountID().str(),
         proto::ACCOUNTEVENT_OUTGOINGCHEQUE,
-        cheque->GetTransactionNum(),
-        cheque->GetAmount(),
+        workflow->id(),
+        -1 * cheque->GetAmount(),
         0,
         time,
         cheque->GetMemo().Get());
@@ -550,10 +550,10 @@ std::pair<OTIdentifier, proto::PaymentWorkflow> Workflow::create_cheque(
 
     if (nullptr != message) {
         event.set_type(proto::PAYMENTEVENTTYPE_CONVEY);
-        event.add_item(String(*message).Get());
+        event.set_transport(message->m_strNotaryID->Get());
         event.set_time(message->m_lTime);
         event.set_method(proto::TRANSPORTMETHOD_OT);
-        event.set_transport(String(message->m_strNotaryID).Get());
+        event.set_transport(message->m_strNotaryID->Get());
     } else {
         event.set_time(now());
 
@@ -621,7 +621,7 @@ bool Workflow::DepositCheque(
             cheque.GetSenderNymID().str(),
             accountID.str(),
             proto::ACCOUNTEVENT_INCOMINGCHEQUE,
-            cheque.GetTransactionNum(),
+            workflow->id(),
             cheque.GetAmount(),
             0,
             std::chrono::system_clock::from_time_t(reply->m_lTime),
@@ -857,9 +857,9 @@ OTIdentifier Workflow::ImportCheque(
             cheque.GetSenderNymID().str(),
             "",
             proto::ACCOUNTEVENT_INCOMINGCHEQUE,
-            cheque.GetTransactionNum(),
-            cheque.GetAmount(),
+            workflowID->str(),
             0,
+            cheque.GetAmount(),
             time,
             cheque.GetMemo().Get());
     }
@@ -978,9 +978,9 @@ OTIdentifier Workflow::ReceiveCheque(
             cheque.GetSenderNymID().str(),
             "",
             proto::ACCOUNTEVENT_INCOMINGCHEQUE,
-            cheque.GetTransactionNum(),
-            cheque.GetAmount(),
+            workflowID->str(),
             0,
+            cheque.GetAmount(),
             time,
             cheque.GetMemo().Get());
     }
@@ -1100,7 +1100,7 @@ void Workflow::update_rpc(
     const std::string& remoteNymID,
     const std::string& accountID,
     const proto::AccountEventType type,
-    const TransactionNumber number,
+    const std::string& workflowID,
     const Amount amount,
     const Amount pending,
     const std::chrono::time_point<std::chrono::system_clock> time,
@@ -1120,13 +1120,17 @@ void Workflow::update_rpc(
             contact_.NymToContact(Identifier::Factory(remoteNymID))->str());
     }
 
-    event.set_number(number);
+    event.set_workflow(workflowID);
     event.set_amount(amount);
     event.set_pendingamount(pending);
     event.set_timestamp(std::chrono::system_clock::to_time_t(time));
     event.set_memo(memo);
+
+    OT_ASSERT(proto::Validate(push, VERBOSE));
+
     auto message = zmq::Message::Factory();
     message->AddFrame();
+    message->AddFrame(localNymID);
     message->AddFrame(proto::ProtoAsData(push));
     rpc_publisher_->Push(message);
 }
@@ -1187,9 +1191,9 @@ OTIdentifier Workflow::WriteCheque(const opentxs::Cheque& cheque) const
             cheque.GetRecipientNymID().str(),
             cheque.SourceAccountID().str(),
             proto::ACCOUNTEVENT_OUTGOINGCHEQUE,
-            cheque.GetTransactionNum(),
+            workflowID->str(),
             0,
-            cheque.GetAmount(),
+            -1 * cheque.GetAmount(),
             time,
             cheque.GetMemo().Get());
     }

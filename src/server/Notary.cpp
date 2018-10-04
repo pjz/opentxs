@@ -2189,8 +2189,7 @@ void Notary::NotarizePayDividend(
                     "shares-based. Asset type ID: %s\n",
                     szFunc,
                     strSharesType->Get());
-            } else if (!(String(purportedID) ==
-                         String(pSharesContract->Nym()->ID()))) {
+            } else if (!(purportedID == pSharesContract->Nym()->ID())) {
                 const auto strSharesType =
                     String::Factory(SHARES_INSTRUMENT_DEFINITION_ID);
                 Log::vError(
@@ -5875,7 +5874,10 @@ void Notary::NotarizeMarketOffer(
                     bOutSuccess = true;  // The offer was successfully
                                          // placed on the market.
 
-                    otInfo << "Successfully added Trade to Cron object.\n";
+                    LogVerbose(OT_METHOD)(__FUNCTION__)(
+                        " : "
+                        "Successfully added Trade to Cron object.")
+                        .Flush();
 
                     // Server side, the Nym stores a list of all open cron
                     // item numbers. (So we know if there is still stuff

@@ -574,6 +574,16 @@ std::unique_ptr<OTPayment> Factory::Payment(const String& strPayment) const
     return payment;
 }
 
+std::unique_ptr<OTPayment> Factory::Payment(
+    const opentxs::Contract& contract) const
+{
+    auto payment = Factory::Payment(String::Factory(contract));
+
+    if (payment) { payment->SetTempValues(); }
+
+    return payment;
+}
+
 #if OT_CRYPTO_WITH_BIP39
 OTPaymentCode Factory::PaymentCode(const std::string& base58) const
 {

@@ -103,16 +103,17 @@ const String& OTPaths::AppBinaryFolder()
     return OTPaths::s_strAppBinaryFolder;
 }
 
-void OTPaths::SetAppBinaryFolder(String strLocation)
+void OTPaths::SetAppBinaryFolder(const String& strLocation)
 {
-    OTPaths::s_strAppBinaryFolder = strLocation;
+    //  OTPaths::s_strAppBinaryFolder = String::Factory(strLocation.Get());
+    OTPaths::s_strAppBinaryFolder->Set(strLocation);
 }
 
 const String& OTPaths::HomeFolder() { return OTPaths::s_strHomeFolder; }
 
-void OTPaths::SetHomeFolder(String strLocation)
+void OTPaths::SetHomeFolder(const String& strLocation)
 {
-    OTPaths::s_strHomeFolder = strLocation;
+    OTPaths::s_strHomeFolder->Set(strLocation);
 
     s_strAppDataFolder->Release();  // So it will be regenerated.
 
@@ -835,10 +836,10 @@ bool OTPaths::ConfirmCreateFolder(
 #endif
 
         if (!bCreateDirSuccess) {
-            otInfo << OT_METHOD << __FUNCTION__
-                   << ": Unable To Confirm "
-                      "Created Directory "
-                   << strExactPath << ".\n";
+            LogVerbose(OT_METHOD)(__FUNCTION__)
+                   (": Unable To Confirm ")
+                      ("Created Directory ")
+                   (strExactPath).Flush();
             out_IsNew = false;
             out_Exists = false;
             return false;
@@ -986,8 +987,9 @@ bool OTPaths::GetHomeFromSystem(String& out_strHomeFolder)
 
     auto home = String::Factory(getenv("HOME"));
     auto library = String::Factory();
-    AppendFolder(library, home, "Library");
-    AppendFolder(out_strHomeFolder, library, "Application Support");
+    AppendFolder(library, home, String::Factory("Library"));
+    AppendFolder(
+        out_strHomeFolder, library, String::Factory("Application Support"));
 
 #else
     out_strHomeFolder.Set(getenv("HOME"));
@@ -1185,8 +1187,8 @@ bool OTPaths::BuildFolderPath(
         if (!ConfirmCreateFolder(strPathPart, l_FolderExists, l_bBuiltFolder))
             return false;
         if (bLog && l_bBuiltFolder)
-            otInfo << OT_METHOD << __FUNCTION__
-                   << ": Made new folder: " << l_strPathPart << std::endl;
+            LogVerbose(OT_METHOD)(__FUNCTION__)
+                   (": Made new folder: ") (l_strPathPart).Flush();
 
         if (!out_bFolderCreated && l_bBuiltFolder) out_bFolderCreated = true;
     }

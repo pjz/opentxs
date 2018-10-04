@@ -19,9 +19,9 @@
 
 template class opentxs::Pimpl<opentxs::network::zeromq::PairSocket>;
 
-#define PAIR_ENDPOINT_PATH "pair"
-#define PAIR_ENDPOINT_INSTANCE -1
-#define PAIR_ENDPOINT_VERSION 1
+//#define PAIR_ENDPOINT_PATH "pair"
+//#define PAIR_ENDPOINT_INSTANCE -1
+//#define PAIR_ENDPOINT_VERSION 1
 
 #define OT_METHOD "opentxs::network::zeromq::implementation::PairSocket::"
 
@@ -75,12 +75,12 @@ PairSocket::PairSocket(
 
     if (bind_) {
         init = Socket::bind(lock, endpoint_);
-        otInfo << OT_METHOD << __FUNCTION__ << ": Bound to " << endpoint_
-               << std::endl;
+        LogVerbose(OT_METHOD)(__FUNCTION__)(": Bound to ")(endpoint_).Flush();
+
     } else {
         init = start_client(lock, endpoint_);
-        otInfo << OT_METHOD << __FUNCTION__ << ": Connected to " << endpoint_
-               << std::endl;
+        LogVerbose(OT_METHOD)(__FUNCTION__)(": Connected to ")(endpoint_)
+            .Flush();
     }
 
     OT_ASSERT(init)
@@ -93,11 +93,7 @@ PairSocket::PairSocket(
     : PairSocket(
           context,
           callback,
-          context.BuildEndpoint(
-              PAIR_ENDPOINT_PATH,
-              PAIR_ENDPOINT_INSTANCE,
-              PAIR_ENDPOINT_VERSION,
-              Identifier::Random()->str()),
+          Socket::random_inproc_endpoint(),
           true,
           startThread)
 {

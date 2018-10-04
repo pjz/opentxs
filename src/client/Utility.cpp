@@ -11,7 +11,6 @@
 #include "opentxs/api/network/ZMQ.hpp"
 #include "opentxs/client/OT_API.hpp"
 #include "opentxs/client/OTAPI_Exec.hpp"
-#include "opentxs/client/SwigWrap.hpp"
 #include "opentxs/consensus/ServerContext.hpp"
 #include "opentxs/core/Identifier.hpp"
 #include "opentxs/core/Ledger.hpp"
@@ -38,11 +37,13 @@ bool VerifyMessage(const std::string& message)
     return true;
 }
 
-NetworkOperationStatus VerifyMessageSuccess(const std::string& message)
+NetworkOperationStatus VerifyMessageSuccess(
+    const api::client::Manager& api,
+    const std::string& message)
 {
     if (!VerifyMessage(message)) { return REPLY_NOT_RECEIVED; }
 
-    const auto status = SwigWrap::Message_GetSuccess(message);
+    const auto status = api.Exec().Message_GetSuccess(message);
 
     switch (status) {
         case REPLY_NOT_RECEIVED: {
@@ -70,6 +71,7 @@ NetworkOperationStatus VerifyMessageSuccess(const std::string& message)
 }
 
 std::int32_t VerifyMsgBalanceAgrmntSuccess(
+    const api::client::Manager& api,
     const std::string& NOTARY_ID,
     const std::string& NYM_ID,
     const std::string& ACCOUNT_ID,
@@ -77,7 +79,7 @@ std::int32_t VerifyMsgBalanceAgrmntSuccess(
 {
     if (!VerifyMessage(strMessage)) { return -1; }
 
-    std::int32_t nSuccess = SwigWrap::Message_GetBalanceAgreementSuccess(
+    std::int32_t nSuccess = api.Exec().Message_GetBalanceAgreementSuccess(
         NOTARY_ID, NYM_ID, ACCOUNT_ID, strMessage);
     switch (nSuccess) {
         case -1:
@@ -110,6 +112,7 @@ std::int32_t VerifyMsgBalanceAgrmntSuccess(
 }
 
 std::int32_t VerifyMsgTrnxSuccess(
+    const api::client::Manager& api,
     const std::string& NOTARY_ID,
     const std::string& NYM_ID,
     const std::string& ACCOUNT_ID,
@@ -117,7 +120,7 @@ std::int32_t VerifyMsgTrnxSuccess(
 {
     if (!VerifyMessage(strMessage)) { return -1; }
 
-    std::int32_t nSuccess = SwigWrap::Message_GetTransactionSuccess(
+    std::int32_t nSuccess = api.Exec().Message_GetTransactionSuccess(
         NOTARY_ID, NYM_ID, ACCOUNT_ID, strMessage);
     switch (nSuccess) {
         case -1:
@@ -151,13 +154,14 @@ std::int32_t VerifyMsgTrnxSuccess(
 // This code was repeating a lot, so I just added a function for it.
 //
 std::int32_t InterpretTransactionMsgReply(
+    const api::client::Manager& api,
     const std::string& NOTARY_ID,
     const std::string& NYM_ID,
     const std::string& ACCOUNT_ID,
     const std::string& strAttempt,
     const std::string& strResponse)
 {
-    std::int32_t nMessageSuccess = VerifyMessageSuccess(strResponse);
+    std::int32_t nMessageSuccess = VerifyMessageSuccess(api, strResponse);
     if (-1 == nMessageSuccess) {
         otOut << __FUNCTION__ << ": Message error: " << strAttempt << ".\n";
         return -1;
@@ -170,7 +174,7 @@ std::int32_t InterpretTransactionMsgReply(
     }
 
     std::int32_t nBalanceSuccess = VerifyMsgBalanceAgrmntSuccess(
-        NOTARY_ID, NYM_ID, ACCOUNT_ID, strResponse);
+        api, NOTARY_ID, NYM_ID, ACCOUNT_ID, strResponse);
     if (-1 == nBalanceSuccess) {
         otOut << __FUNCTION__ << ": Balance agreement error: " << strAttempt
               << ".\n";
@@ -183,7 +187,7 @@ std::int32_t InterpretTransactionMsgReply(
     }
 
     std::int32_t nTransSuccess =
-        VerifyMsgTrnxSuccess(NOTARY_ID, NYM_ID, ACCOUNT_ID, strResponse);
+        VerifyMsgTrnxSuccess(api, NOTARY_ID, NYM_ID, ACCOUNT_ID, strResponse);
     if (-1 == nTransSuccess) {
         otOut << __FUNCTION__ << ": Transaction error: " << strAttempt << ".\n";
         return -1;
@@ -206,9 +210,12 @@ Utility::Utility(ServerContext& context, const api::client::Manager& api)
 {
 }
 
-void Utility::delay() const { SwigWrap::Sleep(delay_ms); }
+void Utility::delay() const { Log::Sleep(std::chrono::milliseconds(delay_ms)); }
 
-void Utility::longDelay() const { SwigWrap::Sleep(delay_ms + 200); }
+void Utility::longDelay() const
+{
+    Log::Sleep(std::chrono::milliseconds(delay_ms + 200));
+}
 
 std::int32_t Utility::getNbrTransactionCount() const { return max_trans_dl; }
 
@@ -247,7 +254,7 @@ std::int32_t Utility::getNymboxLowLevel(bool& bWasSent)
     switch (status) {
         case SendResult::VALID_REPLY: {
             bWasSent = true;
-            setLastReplyReceived(String(*reply).Get());
+            setLastReplyReceived(String::Factory(*reply)->Get());
 
             return nRequestNum;
         } break;
@@ -283,7 +290,7 @@ std::int32_t Utility::getNymbox(
 {
     std::string strLocation = "Utility::getNymbox";
 
-    std::string strRecentHash = SwigWrap::GetNym_RecentHash(notaryID, nymID);
+    std::string strRecentHash = api_.Exec().GetNym_RecentHash(notaryID, nymID);
     bool bRecentHash = VerifyStringVal(strRecentHash);
     if (!bRecentHash) {
         otOut << strLocation
@@ -293,7 +300,7 @@ std::int32_t Utility::getNymbox(
                  "downloaded it before?)\n\n";
     }
 
-    std::string strLocalHash = SwigWrap::GetNym_NymboxHash(notaryID, nymID);
+    std::string strLocalHash = api_.Exec().GetNym_NymboxHash(notaryID, nymID);
     bool bLocalHash = VerifyStringVal(strLocalHash);
     if (!bLocalHash) {
         otWarn << strLocation
@@ -319,7 +326,7 @@ std::int32_t Utility::getNymbox(
     bool bWasMsgSent = false;
     std::int32_t nGetNymbox = getNymboxLowLevel(bWasMsgSent);
 
-    if (SwigWrap::networkFailure(notaryID)) return -1;
+    if (ConnectionState::ACTIVE != api_.ZMQ().Status(notaryID)) return -1;
 
     if (bWasMsgSent) {
         otWarn << strLocation
@@ -426,7 +433,7 @@ std::int32_t Utility::getNymbox(
 
         // Grabbing again in case it's changed.
         std::string strServerHash =
-            SwigWrap::Message_GetNymboxHash(lastReplyReceived);
+            api_.Exec().Message_GetNymboxHash(lastReplyReceived);
         bool bServerHash = VerifyStringVal(strServerHash);
         if (!bServerHash) {
             otOut << strLocation
@@ -435,7 +442,7 @@ std::int32_t Utility::getNymbox(
                   << lastReplyReceived << "\n";
         }
 
-        strLocalHash = SwigWrap::GetNym_NymboxHash(notaryID, nymID);
+        strLocalHash = api_.Exec().GetNym_NymboxHash(notaryID, nymID);
         bLocalHash = VerifyStringVal(strLocalHash);
         if (!bLocalHash) {
             otOut << strLocation
@@ -707,12 +714,13 @@ std::int32_t Utility::getAndProcessNymbox_8(
                 // FIRST, before trying to remove.
                 // (Might want different messages in either case.)
                 //
-                bool nRemovedMsg = SwigWrap::RemoveSentMessage(
+                bool nRemovedMsg = api_.Exec().RemoveSentMessage(
                     std::int64_t(nRequestNumber), notaryID, nymID);
-                otInfo << strLocation
-                       << ": OT_API_RemoveSentMessage: (Found server reply in "
-                          "Nymbox. Removing local sent msg.) Request number: "
-                       << nRemovedMsg << "\n";
+                LogVerbose(OT_METHOD)(__FUNCTION__)(strLocation)(
+                    ": (Found server reply in ")(
+                    "Nymbox. Removing local sent msg.) Request number: ")(
+                    nRemovedMsg)
+                    .Flush();
             } else  // We DIDN'T find it in the nymbox, so we can harvest it:
             {
                 // NOTE: This may always fail,
@@ -721,16 +729,17 @@ std::int32_t Utility::getAndProcessNymbox_8(
                     ": FYI: Calling OT_API_GetSentMessage...")
                     .Flush();
 
-                std::string strSentMsg = SwigWrap::GetSentMessage(
+                std::string strSentMsg = api_.Exec().GetSentMessage(
                     std::int64_t(nRequestNumber), notaryID, nymID);
 
                 if (!VerifyStringVal(strSentMsg)) {
-                    otInfo << strLocation
-                           << ": (1) OT_API_GetSentMessage returned nullptr "
-                              "for clawback. (Must have already been cleared. "
-                              "OT uses deliberate redundancy, though optimizes "
-                              "this wherever possible.) Request number: "
-                           << nRequestNumber << "\n";
+                    LogVerbose(OT_METHOD)(__FUNCTION__)(strLocation)(
+                        ": (1) OT_API_GetSentMessage returned nullptr ")(
+                        "for clawback. (Must have already been cleared. ")(
+                        "OT uses deliberate redundancy, though optimizes ")(
+                        "this wherever possible.) Request number: ")(
+                        nRequestNumber)
+                        .Flush();
                 } else  // SwigWrap::GetSentMessage success.
                 {
                     otOut << strLocation
@@ -738,7 +747,7 @@ std::int32_t Utility::getAndProcessNymbox_8(
                              "numbers from failed Msg "
                              "attempt...\n";
 
-                    bool nHarvested = SwigWrap::Msg_HarvestTransactionNumbers(
+                    bool nHarvested = api_.Exec().Msg_HarvestTransactionNumbers(
                         strSentMsg,
                         nymID,
                         bHarvestingForRetry,  // bHarvestingForRetry.
@@ -759,11 +768,11 @@ std::int32_t Utility::getAndProcessNymbox_8(
                           << ": OT_API_Msg_HarvestTransactionNumbers: "
                           << nHarvested << "\n";
 
-                    bool nRemovedMsg = SwigWrap::RemoveSentMessage(
+                    bool nRemovedMsg = api_.Exec().RemoveSentMessage(
                         std::int64_t(nRequestNumber), notaryID, nymID);
-                    otInfo << strLocation
-                           << ": OT_API_RemoveSentMessage: " << nRemovedMsg
-                           << "\n";
+                    LogVerbose(OT_METHOD)(__FUNCTION__)(strLocation)(
+                        nRemovedMsg)
+                        .Flush();
                 }  // strSentMsg NOT null!
             }
         }
@@ -806,7 +815,7 @@ std::int32_t Utility::getAndProcessNymbox_8(
         // record already
         // for each one, that we will have the info we need already.)
         //
-        std::string strNymbox = SwigWrap::LoadNymboxNoVerify(
+        std::string strNymbox = api_.Exec().LoadNymboxNoVerify(
             notaryID, nymID);  // FLUSH SENT MESSAGES!!!!  (AND HARVEST.);
 
         if (VerifyStringVal(strNymbox)) {
@@ -1106,17 +1115,17 @@ std::int32_t Utility::getAndProcessNymbox_8(
                         .Flush();
 
                     std::string strSentProcessNymboxMsg =
-                        SwigWrap::GetSentMessage(
+                        api_.Exec().GetSentMessage(
                             std::int64_t(nProcess), notaryID, nymID);
 
                     if (!VerifyStringVal(strSentProcessNymboxMsg)) {
-                        otInfo << strLocation
-                               << ": (2) OT_API_GetSentMessage returned "
-                                  "nullptr for clawback. (Must have already "
-                                  "been cleared. OT uses deliberate "
-                                  "redundancy, though optimizes this wherever "
-                                  "possible.) Request number: "
-                               << nProcess << "\n";
+                        LogVerbose(OT_METHOD)(__FUNCTION__)(strLocation)(
+                            ": (2) OT_API_GetSentMessage returned ")(
+                            "nullptr for clawback. (Must have already ")(
+                            "been cleared. OT uses deliberate ")(
+                            "redundancy, though optimizes this wherever ")(
+                            "possible.) Request number: ")(nProcess)
+                            .Flush();
                     } else  // strSentProcessNymboxMsg NOT null!
                     {
                         otOut << strLocation
@@ -1124,7 +1133,7 @@ std::int32_t Utility::getAndProcessNymbox_8(
                                  "numbers from failed "
                                  "processNymbox attempt...\n";
 
-                        nHarvested = SwigWrap::Msg_HarvestTransactionNumbers(
+                        nHarvested = api_.Exec().Msg_HarvestTransactionNumbers(
                             strSentProcessNymboxMsg,
                             nymID,
                             false,  // bHarvestingForRetry = = false;
@@ -1150,16 +1159,17 @@ std::int32_t Utility::getAndProcessNymbox_8(
                               << nHarvested << "\n";
 
                         bool nRemovedProcessNymboxMsg =
-                            SwigWrap::RemoveSentMessage(
+                            api_.Exec().RemoveSentMessage(
                                 std::int64_t(nProcess), notaryID, nymID);
 
-                        otInfo << strLocation << ": OT_API_RemoveSentMessage: "
-                               << nRemovedProcessNymboxMsg << "\n";
+                        LogVerbose(OT_METHOD)(__FUNCTION__)(strLocation)(
+                            nRemovedProcessNymboxMsg)
+                            .Flush();
                     }  // strSentProcessNymboxMsg NOT null!
                 }  // a specific receipt was not found in the nymbox (need to
                    // clawback the transaction numbers on that receipt.)
 
-                strNymbox = SwigWrap::LoadNymboxNoVerify(
+                strNymbox = api_.Exec().LoadNymboxNoVerify(
                     notaryID,
                     nymID);  // FLUSH SENT MESSAGES!!!!  (AND HARVEST.);
                 if (VerifyStringVal(strNymbox)) {
@@ -1368,22 +1378,22 @@ std::int32_t Utility::processNymbox(
 
     OT_ASSERT(reply)
 
-    const std::string strReplyProcess = String(*reply).Get();
-    std::int32_t nReplySuccess =
-        VerifyMessageSuccess(strReplyProcess);  // sendProcessNymboxLowLevel;
+    const std::string strReplyProcess = String::Factory(*reply)->Get();
+    std::int32_t nReplySuccess = VerifyMessageSuccess(
+        api_, strReplyProcess);  // sendProcessNymboxLowLevel;
     std::int32_t nTransSuccess = -1;
     std::int32_t nBalanceSuccess = -1;
     ;
     if (nReplySuccess > 0)  // If message was success, then let's see if the
                             // transaction was, too.
     {
-        nBalanceSuccess = SwigWrap::Message_GetBalanceAgreementSuccess(
+        nBalanceSuccess = api_.Exec().Message_GetBalanceAgreementSuccess(
             notaryID,
             nymID,
             nymID,
             strReplyProcess);  // the processNymbox transaction.;
         if (nBalanceSuccess > 0) {
-            nTransSuccess = SwigWrap::Message_GetTransactionSuccess(
+            nTransSuccess = api_.Exec().Message_GetTransactionSuccess(
                 notaryID,
                 nymID,
                 nymID,
@@ -1428,7 +1438,7 @@ bool Utility::getBoxReceiptLowLevel(
     switch (status) {
         case SendResult::VALID_REPLY: {
             bWasSent = true;
-            setLastReplyReceived(String(*reply).Get());
+            setLastReplyReceived(String::Factory(*reply)->Get());
 
             return true;
         } break;
@@ -1775,7 +1785,7 @@ bool Utility::insureHaveAllBoxReceipts(
         // I already acknowledged. (No need to force any downloads
         // based on THAT case, after all.)
         //
-        std::string strReplyNotice = SwigWrap::Nymbox_GetReplyNotice(
+        std::string strReplyNotice = api_.Exec().Nymbox_GetReplyNotice(
             notaryID, nymID, std::int64_t(nRequestSeeking));
 
         if (VerifyStringVal(strReplyNotice)) { bFoundIt = true; }
@@ -2288,7 +2298,7 @@ std::int32_t Utility::getInboxAccount(
         case SendResult::VALID_REPLY: {
             bWasSentAccount = true;
             bWasSentInbox = true;
-            setLastReplyReceived(String(*reply).Get());
+            setLastReplyReceived(String::Factory(*reply)->Get());
         } break;
         case SendResult::TIMEOUT: {
             otErr << OT_METHOD << __FUNCTION__
@@ -2306,8 +2316,8 @@ std::int32_t Utility::getInboxAccount(
         }
     }
 
-    const std::string notaryID = String(context_.Server()).Get();
-    const std::string nymID = String(context_.Nym()->ID()).Get();
+    const std::string notaryID = String::Factory(context_.Server())->Get();
+    const std::string nymID = String::Factory(context_.Nym()->ID())->Get();
 
     // DOWNLOAD THE BOX RECEIPTS.
     if (!insureHaveAllBoxReceipts(
@@ -2359,8 +2369,8 @@ bool Utility::getInboxOutboxAccount(
         return false;
     }
 
-    std::string notaryID = SwigWrap::GetAccountWallet_NotaryID(accountID);
-    std::string nymID = SwigWrap::GetAccountWallet_NymID(accountID);
+    std::string notaryID = api_.Exec().GetAccountWallet_NotaryID(accountID);
+    std::string nymID = api_.Exec().GetAccountWallet_NymID(accountID);
     if (!getIntermediaryFiles(notaryID, nymID, accountID, bForceDownload)) {
         otOut << strLocation << ": getIntermediaryFiles failed. (Returning.)\n";
         return false;
