@@ -70,7 +70,7 @@ bool MintLucre::AddDenomination(
     bool bReturnValue = false;
 
     // Let's make sure it doesn't already exist
-    Armored theArmor;
+    auto theArmor = Armored::Factory();
     if (GetPublic(theArmor, lDenomination)) {
         otErr << "Error: Denomination public already exists in "
                  "OTMint::AddDenomination\n";
@@ -93,12 +93,14 @@ bool MintLucre::AddDenomination(
         return false;
     }
 
+#if OT_LUCRE_DEBUG
 #ifdef _WIN32
     BIO* out = BIO_new_file("openssl.dump", "w");
     assert(out);
     SetDumper(out);
 #else
     SetMonitor(stderr);
+#endif
 #endif
 
     crypto::implementation::OpenSSL_BIO bio = BIO_new(BIO_s_mem());
@@ -183,7 +185,7 @@ bool MintLucre::SignToken(
     crypto::implementation::OpenSSL_BIO bioSignature =
         BIO_new(BIO_s_mem());  // output
 
-    Armored thePrivate;
+    auto thePrivate = Armored::Factory();
     GetPrivate(thePrivate, theToken.GetDenomination());
 
     // The Mint private info is encrypted in
@@ -202,7 +204,7 @@ bool MintLucre::SignToken(
     Bank bank(bioBank);
 
     // I need the request. the prototoken.
-    Armored ascPrototoken;
+    auto ascPrototoken = Armored::Factory();
     bool bFoundToken = theToken.GetPrototoken(ascPrototoken, nTokenIndex);
 
     if (bFoundToken) {
@@ -297,7 +299,7 @@ bool MintLucre::VerifyToken(
 
     // --- The Mint private info is encrypted in m_mapPrivate[lDenomination].
     // So I need to extract that first before I can use it.
-    Armored theArmor;
+    auto theArmor = Armored::Factory();
     GetPrivate(theArmor, lDenomination);
     OTEnvelope theEnvelope(theArmor);
 
