@@ -105,7 +105,8 @@ extern "C" std::int32_t default_pass_cb(
     len = static_cast<std::int32_t>(strlen(tmp_passwd));
 
     if (len <= 0) {
-        opentxs::otOut << __FUNCTION__ << ": Problem? Returning 0...\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(": Problem? Returning 0...")
+            .Flush();
 
         return 0;
     }
@@ -238,9 +239,9 @@ extern "C" std::int32_t souped_up_pass_cb(
     }
 
     if (false == bGotPassword) {
-        opentxs::otOut
-            << __FUNCTION__
-            << ": Failure: (false == bGotPassword.) (Returning 0.)\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Failure: (false == bGotPassword). (Returning 0).")
+            .Flush();
 
         return 0;
     }
@@ -250,18 +251,20 @@ extern "C" std::int32_t souped_up_pass_cb(
                                                 : thePassword.getMemorySize();
 
     if (len < 0) {
-        opentxs::otOut << __FUNCTION__
-                       << ": <0 length password was "
-                          "returned from the API password callback. "
-                          "Returning 0.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": <0 length password was "
+            "returned from the API password callback. "
+            "Returning 0.")
+            .Flush();
 
         return 0;
     } else if (len == 0) {
         const char* szDefault = "test";
-        opentxs::otOut << __FUNCTION__
-                       << ": 0 length password was "
-                          "returned from the API password callback. "
-                          "Substituting default password 'test'.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": 0 length password was "
+            "returned from the API password callback. "
+            "Substituting default password 'test'.")
+            .Flush();
 
         if (thePassword.isPassword()) {
             thePassword.setPassword(
@@ -346,7 +349,7 @@ Native::Native(
     , legacy_(opentxs::Factory::Legacy())
     , client_()
     , server_()
-    , zap_(opentxs::Factory::ZAP(zmq_context_))
+    , zap_(nullptr)
     , server_args_(args)
     , shutdown_callback_{nullptr}
     , null_callback_{nullptr}
@@ -357,7 +360,6 @@ Native::Native(
     // NOTE: OT_ASSERT is not available until Init() has been called
     assert(legacy_);
     assert(log_);
-    assert(zap_);
 
     if (nullptr == external_password_callback_) {
         setup_default_external_password_callback();
@@ -461,6 +463,7 @@ void Native::Init()
 {
     Init_Log();
     Init_Crypto();
+    Init_Zap();
 }
 
 void Native::Init_Crypto()
@@ -476,6 +479,22 @@ void Native::Init_Log()
     const auto init = Log::Init(Config(legacy_->LogConfigFilePath()));
 
     if (false == init) { abort(); }
+}
+
+void Native::Init_Zap()
+{
+    zap_.reset(opentxs::Factory::ZAP(zmq_context_));
+
+    OT_ASSERT(zap_);
+}
+
+const ArgList Native::merge_arglist(const ArgList& args) const
+{
+    ArgList arguments{server_args_};
+
+    for (const auto& [arg, val] : args) { arguments[arg] = val; }
+
+    return arguments;
 }
 
 proto::RPCResponse Native::RPC(const proto::RPCCommand& command) const
@@ -556,11 +575,12 @@ void Native::start_client(const Lock& lock, const ArgList& args) const
     OT_ASSERT(crypto_);
     OT_ASSERT(legacy_);
 
+    auto merged_args = merge_arglist(args);
     const int next = client_.size();
     const auto instance = client_instance(next);
     client_.emplace_back(opentxs::Factory::ClientManager(
         running_,
-        args,
+        merged_args,
         Config(legacy_->ClientConfigFilePath(next)),
         *crypto_,
         zmq_context_,
@@ -594,11 +614,12 @@ void Native::start_server(const Lock& lock, const ArgList& args) const
     OT_ASSERT(verify_lock(lock))
     OT_ASSERT(crypto_);
 
+    const auto merged_args = merge_arglist(args);
     const auto next{server_.size()};
     const auto instance{server_instance(next)};
     server_.emplace_back(opentxs::Factory::ServerManager(
         running_,
-        args,
+        merged_args,
         *crypto_,
         Config(legacy_->ServerConfigFilePath(next)),
         zmq_context_,

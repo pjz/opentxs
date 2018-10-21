@@ -93,7 +93,9 @@ private:
 
     void Init_Crypto();
     void Init_Log();
+    void Init_Zap();
     void Init() override;
+    const ArgList merge_arglist(const ArgList& args) const;
     void shutdown() override;
     void start_client(const Lock& lock, const ArgList& args) const;
     void start_server(const Lock& lock, const ArgList& args) const;
