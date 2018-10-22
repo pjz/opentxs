@@ -26,7 +26,7 @@
 #include "opentxs/core/Log.hpp"
 #include "opentxs/core/Nym.hpp"
 #include "opentxs/core/OTStorage.hpp"
-#include "opentxs/core/OTStringXML.hpp"
+#include "opentxs/core/StringXML.hpp"
 #include "opentxs/core/String.hpp"
 
 #include <irrxml/irrXML.hpp>
@@ -174,8 +174,9 @@ bool Purse::GetPassphrase(OTPassword& theOutput, const char* szDisplay)
     const char* szFunc = "Purse::GetPassphrase";
 
     if (!IsPasswordProtected()) {
-        otOut << szFunc
-              << ": Failed: this purse isn't even password-protected.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Failed: This purse isn't even password-protected.")
+            .Flush();
         return false;
     }
 
@@ -201,15 +202,17 @@ const OTCachedKey& Purse::GetInternalMaster()
 {
 
     if (false == IsPasswordProtected() || (false == bool(m_pCachedKey))) {
-        otOut << __FUNCTION__
-              << ": Failed: no internal master key exists, in this purse.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Failed: No internal master key exists, in this purse.")
+            .Flush();
 
         OT_FAIL;
     }
 
     if (false == m_pCachedKey->IsGenerated()) {
-        otOut << __FUNCTION__
-              << ": Error: internal master key has not yet been generated.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Error: Internal master key has not yet been generated.")
+            .Flush();
 
         OT_FAIL;
     }
@@ -243,22 +246,24 @@ bool Purse::GenerateInternalKey()
     if (IsPasswordProtected() ||
         (m_pSymmetricKey.get()) ||  // GetInternalKey())
         (m_pCachedKey)) {
-        otOut << __FUNCTION__
-              << ": Failed: internal Key  or master key already exists. "
-                 "Or IsPasswordProtected was true.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Failed: Internal Key or master key already exists. "
+            "Or IsPasswordProtected was true.")
+            .Flush();
         return false;
     }
 
     if (!IsEmpty()) {
-        otOut << __FUNCTION__
-              << ": Failed: The purse must be EMPTY before you create a "
-                 "new symmetric key, internal to that purse. (For the purposes "
-                 "of "
-                 "adding a passphrase to the purse, normally.) Otherwise I "
-                 "would have "
-                 "to loop through all the tokens and re-assign ownership of "
-                 "each one. "
-                 "Instead, I'm just going to return false. That's easier.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Failed: The purse must be EMPTY before you create a "
+            "new symmetric key, internal to that purse. (For the purposes "
+            "of "
+            "adding a passphrase to the purse, normally.) Otherwise I "
+            "would have "
+            "to loop through all the tokens and re-assign ownership of "
+            "each one. "
+            "Instead, I'm just going to return false. That's easier.")
+            .Flush();
         return false;
     }
 
@@ -295,8 +300,9 @@ bool Purse::GenerateInternalKey()
     // already checks it.
     // todo optimize.
     {
-        otOut << __FUNCTION__
-              << ": Failed: While calling OTCachedKey::CreateMasterPassword.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Failed: While calling OTCachedKey::CreateMasterPassword.")
+            .Flush();
         return false;
     }
 
@@ -309,7 +315,9 @@ bool Purse::GenerateInternalKey()
     OT_ASSERT(m_pSymmetricKey.get());
 
     if (!m_pSymmetricKey->IsGenerated()) {
-        otOut << __FUNCTION__ << ": Failed: generating m_pSymmetricKey.\n";
+        opentxs::LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Failed: Generating m_pSymmetricKey.")
+            .Flush();
         m_pSymmetricKey = crypto::key::LegacySymmetric::Blank();
         m_pCachedKey.reset();
 
@@ -319,8 +327,9 @@ bool Purse::GenerateInternalKey()
     m_NymID->Release();
     m_bIsNymIDIncluded = false;
 
-    otWarn << __FUNCTION__
-           << ": Successfully created a purse's internal key.\n";
+    LogDetail(OT_METHOD)(__FUNCTION__)(
+        ": Successfully created a purse's internal key.")
+        .Flush();
 
     m_bPasswordProtected = true;
     GetInternalMaster();
@@ -459,9 +468,10 @@ bool Purse::Merge(
                   << ": Error: Failed while attempting to re-assign "
                      "ownership of token during purse merge.\n";
         } else {
-            otWarn << szFunc
-                   << ": FYI: Success re-assigning ownership of "
-                      "token during purse merge.\n";
+            LogDetail(OT_METHOD)(__FUNCTION__)(
+                ": FYI: Success re-assigning ownership of "
+                "token during purse merge.")
+                .Flush();
 
             pToken->ReleaseSignatures();
             pToken->SignContract(theSigner);
@@ -706,7 +716,7 @@ void Purse::UpdateContents()  // Before transmission or serialization, this is
                    String::Factory(m_InstrumentDefinitionID);
 
     // I release this because I'm about to repopulate it.
-    m_xmlUnsigned.Release();
+    m_xmlUnsigned->Release();
 
     Tag tag("purse");
 
@@ -789,7 +799,7 @@ void Purse::UpdateContents()  // Before transmission or serialization, this is
     std::string str_result;
     tag.output(str_result);
 
-    m_xmlUnsigned.Concatenate("%s", str_result.c_str());
+    m_xmlUnsigned->Concatenate("%s", str_result.c_str());
 }
 
 std::int32_t Purse::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
@@ -979,7 +989,9 @@ std::int32_t Purse::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
         // By this point, the symmetric key has loaded successfully from
         // storage.
 
-        otWarn << szFunc << ": Successfully loaded a purse's internal key.\n";
+        LogDetail(OT_METHOD)(__FUNCTION__)(
+            ": Successfully loaded a purse's internal key.")
+            .Flush();
 
         // No more worry about pSymmetricKey cleanup, now that this pointer is
         // set.
@@ -1060,7 +1072,9 @@ std::int32_t Purse::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
         // By this point, the symmetric key has loaded successfully from
         // storage.
 
-        otWarn << szFunc << ": Successfully loaded a purse's master key.\n";
+        LogDetail(OT_METHOD)(__FUNCTION__)(
+            ": Successfully loaded a purse's master key.")
+            .Flush();
 
         // No more worry about pSymmetricKey cleanup, now that this pointer is
         // set.
@@ -1080,19 +1094,14 @@ std::int32_t Purse::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
 
         return 1;
     } else if (strNodeName->Compare("token")) {
-        Armored* pArmor = new Armored;
-        OT_ASSERT(nullptr != pArmor);
+        auto pArmor = Armored::Factory();
 
-        if (!Contract::LoadEncodedTextField(xml, *pArmor) ||
-            !pArmor->Exists()) {
+        if (!Contract::LoadEncodedTextField(xml, pArmor) || !pArmor->Exists()) {
             otErr << szFunc << ": Error: token field without value.\n";
-
-            delete pArmor;
-            pArmor = nullptr;
 
             return (-1);  // error condition
         } else {
-            m_dequeTokens.push_front(pArmor);
+            m_dequeTokens.emplace_front(std::move(pArmor));
         }
 
         return 1;
@@ -1150,10 +1159,10 @@ Token* Purse::Peek(OTNym_or_SymmetricKey theOwner) const
 
     // Grab a pointer to the first armored token on the deque.
     //
-    const Armored* pArmor = m_dequeTokens.front();
+    const auto& pArmor = m_dequeTokens.front();
     // ---------------
     // Copy the token contents into an Envelope.
-    OTEnvelope theEnvelope(*pArmor);
+    OTEnvelope theEnvelope(pArmor);
 
     // Open the envelope into a string.
     //
@@ -1213,10 +1222,7 @@ Token* Purse::Pop(OTNym_or_SymmetricKey theOwner)
     // Grab a pointer to the ascii-armored token, and remove it from the deque.
     // (And delete it.)
     //
-    Armored* pArmor = m_dequeTokens.front();
     m_dequeTokens.pop_front();
-    delete pArmor;
-    pArmor = nullptr;
 
     // We keep track of the purse's total value.
     m_lTotalValue -= pToken->GetDenomination();
@@ -1249,11 +1255,8 @@ void Purse::RecalculateExpirationDates(OTNym_or_SymmetricKey& theOwner)
     m_tLatestValidFrom = OT_TIME_ZERO;
     m_tEarliestValidTo = OT_TIME_ZERO;
 
-    for (auto& it : m_dequeTokens) {
-        Armored* pArmor = it;
-        OT_ASSERT(nullptr != pArmor);
-
-        OTEnvelope theEnvelope(*pArmor);
+    for (auto& pArmor : m_dequeTokens) {
+        OTEnvelope theEnvelope(pArmor);
 
         // Open the envelope into a string.
         //
@@ -1316,9 +1319,8 @@ bool Purse::Push(OTNym_or_SymmetricKey theOwner, const Token& theToken)
             theOwner.Seal_or_Encrypt(theEnvelope, strToken, strDisplay);
 
         if (bSuccess) {
-            Armored* pArmor = new Armored(theEnvelope);
-
-            m_dequeTokens.push_front(pArmor);
+            auto pArmor = Armored::Factory(theEnvelope);
+            m_dequeTokens.emplace_front(std::move(pArmor));
 
             // We keep track of the purse's total value.
             m_lTotalValue += theToken.GetDenomination();
@@ -1381,12 +1383,7 @@ bool Purse::IsEmpty() const { return m_dequeTokens.empty(); }
 
 void Purse::ReleaseTokens()
 {
-    while (!m_dequeTokens.empty()) {
-        Armored* pArmor = m_dequeTokens.front();
-        m_dequeTokens.pop_front();
-        delete pArmor;
-    }
-
+    m_dequeTokens.clear();
     m_lTotalValue = 0;
 }
 

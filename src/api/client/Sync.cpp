@@ -227,8 +227,7 @@ Sync::Sync(
 {
     // WARNING: do not access client_.Wallet() during construction
     const auto endpoint = client_.Endpoints().AccountUpdate();
-    otWarn << OT_METHOD << __FUNCTION__ << ": Connecting to " << endpoint
-           << std::endl;
+    LogDetail(OT_METHOD)(__FUNCTION__)(": Connecting to ")(endpoint).Flush();
     auto listening = account_subscriber_->Start(endpoint);
 
     OT_ASSERT(listening)
@@ -308,12 +307,16 @@ std::pair<bool, std::size_t> Sync::accept_incoming(
     remaining = items - count;
 
     if (0 == count) {
-        LogVerbose(OT_METHOD)(__FUNCTION__)(
+        LogOutput(OT_METHOD)(__FUNCTION__)(
             ": No items to accept in this account.")
             .Flush();
         success = true;
 
         return output;
+    } else {
+        LogOutput(OT_METHOD)(__FUNCTION__)(
+            ": Items to accept in this account: ")(count)
+            .Flush();
     }
 
     for (std::size_t i = 0; i < count; i++) {
@@ -508,8 +511,8 @@ Depositability Sync::can_deposit(
             schedule_register_account(recipient, depositServer, unitID);
         } break;
         case Depositability::READY: {
-            otWarn << OT_METHOD << __FUNCTION__ << ": Payment can be deposited."
-                   << std::endl;
+            LogDetail(OT_METHOD)(__FUNCTION__)(": Payment can be deposited.")
+                .Flush();
         } break;
         default: {
             OT_FAIL
@@ -1703,26 +1706,27 @@ void Sync::refresh_accounts() const
         SHUTDOWN()
 
         const auto serverID = Identifier::Factory(server.first);
-        otWarn << OT_METHOD << __FUNCTION__ << ": Considering server "
-               << serverID->str() << std::endl;
+        LogDetail(OT_METHOD)(__FUNCTION__)(": Considering server ")(serverID)
+            .Flush();
 
         for (const auto& nymID : client_.OTAPI().LocalNymList()) {
             SHUTDOWN()
-            otWarn << OT_METHOD << __FUNCTION__ << ": Nym " << nymID->str()
-                   << " ";
+            auto logStr = String::Factory(": Nym ");
+            logStr->Concatenate("%s", nymID->str().c_str());
             const bool registered =
                 client_.OTAPI().IsNym_RegisteredAtServer(nymID, serverID);
 
             if (registered) {
-                otWarn << "is ";
+                logStr->Concatenate(" %s ", "is");
                 auto& queue = get_operations({nymID, serverID});
                 const auto taskID(Identifier::Random());
                 queue.download_nymbox_.Push(taskID, true);
             } else {
-                otWarn << "is not ";
+                logStr->Concatenate(" %s ", "is not");
             }
 
-            otWarn << "registered here." << std::endl;
+            logStr->Concatenate("%s", " registered here.");
+            LogDetail(OT_METHOD)(__FUNCTION__)(logStr).Flush();
         }
     }
 
@@ -1733,10 +1737,9 @@ void Sync::refresh_accounts() const
         const auto accountID = Identifier::Factory(it.first);
         const auto nymID = client_.Storage().AccountOwner(accountID);
         const auto serverID = client_.Storage().AccountServer(accountID);
-        otWarn << OT_METHOD << __FUNCTION__ << ": Account " << accountID->str()
-               << ":\n"
-               << "  * Owned by nym: " << nymID->str() << "\n"
-               << "  * On server: " << serverID->str() << std::endl;
+        LogDetail(OT_METHOD)(__FUNCTION__)(": Account ")(accountID)(": ")(
+            "  * Owned by nym: ")(nymID)("  * On server: ")(serverID)
+            .Flush();
         auto& queue = get_operations({nymID, serverID});
         const auto taskID(Identifier::Random());
         queue.download_account_.Push(taskID, accountID);
@@ -2559,9 +2562,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__
-                       << ": Searching for server contract for "
-                       << targetID->str() << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(
+                    ": Searching for server contract for ")(targetID)
+                    .Flush();
             }
 
             const auto& notUsed[[maybe_unused]] = taskID;
@@ -2580,9 +2583,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__
-                       << ": Searching for unit definition contract for "
-                       << contractID->str() << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(
+                    ": Searching for unit definition contract for ")(contractID)
+                    .Flush();
             }
 
             download_contract(taskID, nymID, serverID, contractID);
@@ -2602,8 +2605,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__ << ": Searching for nym "
-                       << targetID->str() << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(": Searching for nym ")(
+                    targetID)
+                    .Flush();
             }
 
             const auto& notUsed[[maybe_unused]] = taskID;
@@ -2623,8 +2627,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__ << ": Refreshing nym "
-                       << targetNymID->str() << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(": Refreshing nym ")(
+                    targetNymID)
+                    .Flush();
             }
 
             download_nym(taskID, nymID, serverID, targetNymID);
@@ -2641,8 +2646,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__ << ": Searching for nym "
-                       << targetNymID->str() << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(": Searching for nym ")(
+                    targetNymID)
+                    .Flush();
             }
 
             download_nym(taskID, nymID, serverID, targetNymID);
@@ -2668,8 +2674,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
         // Download the nymbox, if this operation has been scheduled
         if (queue.download_nymbox_.Pop(taskID, downloadNymbox)) {
-            otWarn << OT_METHOD << __FUNCTION__ << ": Downloading nymbox for "
-                   << nymID->str() << " on " << serverID->str() << std::endl;
+            LogDetail(OT_METHOD)(__FUNCTION__)(": Downloading nymbox for ")(
+                nymID)(" on ")(serverID)
+                .Flush();
             registerNym |= !download_nymbox(taskID, nymID, serverID);
         }
 
@@ -2772,9 +2779,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__ << ": Downloading account "
-                       << accountID->str() << " for " << nymID->str() << " on "
-                       << serverID->str() << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(": Downloading account ")(
+                    accountID)(" for ")(nymID)(" on ")(serverID)
+                    .Flush();
             }
 
             registerNym |=
@@ -2793,9 +2800,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__ << ": Creating account for "
-                       << unitID->str() << " on " << serverID->str()
-                       << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(": Creating account for ")(
+                    unitID)(" on ")(serverID)
+                    .Flush();
             }
 
             registerNym |= !register_account(taskID, nymID, serverID, unitID);
@@ -2813,9 +2820,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__
-                       << ": Issuing unit definition for " << unitID->str()
-                       << " on " << serverID->str() << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(
+                    ": Issuing unit definition for ")(unitID)(" on ")(serverID)
+                    .Flush();
             }
 
             registerNym |=
@@ -2834,9 +2841,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__
-                       << ": Issuing unit definition for " << unitID->str()
-                       << " on " << serverID->str() << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(
+                    ": Issuing unit definition for ")(unitID)(" on ")(serverID)
+                    .Flush();
             }
 
             registerNym |=
@@ -2867,9 +2874,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
                 } break;
                 case Depositability::NOT_REGISTERED:
                 case Depositability::NO_ACCOUNT: {
-                    otWarn << OT_METHOD << __FUNCTION__
-                           << ": Temporary failure trying to deposit payment"
-                           << std::endl;
+                    LogDetail(OT_METHOD)(__FUNCTION__)(
+                        ": Temporary failure trying to deposit payment")
+                        .Flush();
                     depositPaymentRetry.Push(taskID, deposit);
                 } break;
                 default: {
@@ -2917,9 +2924,9 @@ void Sync::state_machine(const ContextID id, OperationQueue& queue) const
 
                 continue;
             } else {
-                otWarn << OT_METHOD << __FUNCTION__
-                       << ": Uploading server contract " << contractID->str()
-                       << std::endl;
+                LogDetail(OT_METHOD)(__FUNCTION__)(
+                    ": Uploading server contract ")(contractID)
+                    .Flush();
             }
 
             publish_server_contract(taskID, nymID, serverID, contractID);

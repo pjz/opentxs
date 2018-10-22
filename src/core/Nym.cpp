@@ -38,7 +38,7 @@
 #include "opentxs/core/Message.hpp"
 #include "opentxs/core/NymIDSource.hpp"
 #include "opentxs/core/OTStorage.hpp"
-#include "opentxs/core/OTStringXML.hpp"
+#include "opentxs/core/StringXML.hpp"
 #include "opentxs/core/OTTransaction.hpp"
 #include "opentxs/core/String.hpp"
 #include "opentxs/crypto/key/LegacySymmetric.hpp"
@@ -728,7 +728,7 @@ const crypto::key::Asymmetric& Nym::GetPublicEncrKey(
 }
 
 // This is being called by:
-// Contract::VerifySignature(const OTPseudonym& theNym, const OTSignature&
+// Contract::VerifySignature(const Nym& theNym, const Signature&
 // theSignature, OTPasswordData * pPWData=nullptr)
 //
 // Note: Need to change Contract::VerifySignature so that it checks all of
@@ -740,7 +740,7 @@ const crypto::key::Asymmetric& Nym::GetPublicEncrKey(
 // the signature.
 std::int32_t Nym::GetPublicKeysBySignature(
     crypto::key::Keypair::Keys& listOutput,
-    const OTSignature& theSignature,
+    const Signature& theSignature,
     char cKeyType) const
 {
     // Unfortunately, theSignature can only narrow the search down (there may be
@@ -1536,19 +1536,20 @@ bool Nym::verify_pseudonym(const eLock& lock) const
             const OTIdentifier theCredentialNymID =
                 Identifier::Factory(pCredential->GetNymID());
             if (m_nymID != theCredentialNymID) {
-                otOut << __FUNCTION__ << ": Credential NymID ("
-                      << pCredential->GetNymID()
-                      << ") doesn't match actual NymID: " << m_nymID->str()
-                      << "\n";
+                LogNormal(OT_METHOD)(__FUNCTION__)(": Credential NymID (")(
+                    pCredential->GetNymID())(") doesn't match actual NymID: ")(
+                    m_nymID->str())(".")
+                    .Flush();
                 return false;
             }
 
             // Verify all Credentials in the CredentialSet, including source
             // verification for the master credential.
             if (!pCredential->VerifyInternally()) {
-                otOut << __FUNCTION__ << ": Credential ("
-                      << pCredential->GetMasterCredID()
-                      << ") failed its own internal verification." << std::endl;
+                LogNormal(OT_METHOD)(__FUNCTION__)(": Credential (")(
+                    pCredential->GetMasterCredID())(
+                    ") failed its own internal verification.")
+                    .Flush();
                 return false;
             }
         }

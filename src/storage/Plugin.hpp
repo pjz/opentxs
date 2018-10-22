@@ -115,14 +115,15 @@ bool opentxs::api::storage::Driver::LoadProto(
 
     if (!valid) {
         if (loaded) {
-            otErr << "Specified object was located but could not be "
+            otErr << ": Specified object was located but could not be "
                   << "validated." << std::endl
                   << "Hash: " << hash << std::endl
                   << "Size: " << raw.size() << std::endl;
         } else {
-            otWarn << "Specified object is missing." << std::endl
-                   << "Hash: " << hash << std::endl
-                   << "Size: " << raw.size() << std::endl;
+
+            LogDetail("Specified object is missing.").Flush();
+            LogDetail("Hash: ")(hash).Flush();
+            LogDetail("Size: ")(raw.size()).Flush();
         }
     }
 

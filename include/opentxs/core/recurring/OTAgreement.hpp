@@ -57,10 +57,10 @@ private:
 
 protected:
     OTString m_strConsideration;  // Presumably an agreement is in return for
-                                // some consideration. Memo here.
+                                  // some consideration. Memo here.
 
     OTString m_strMerchantSignedCopy;  // The merchant sends it over, then the
-                                     // payer confirms it, which adds
+                                       // payer confirms it, which adds
     // his own transaction numbers and signs it. This, unfortunately,
     // invalidates the merchant's version, so we store
     // a copy of the merchant's signed agreement INSIDE our own. The server can
@@ -192,8 +192,8 @@ public:
 
      THE RECIPIENT:
 
-     3) bool bConfirmation =  pPlan->Confirm(OTPseudonym& PAYER_NYM,
-                                             OTPseudonym *
+     3) bool bConfirmation =  pPlan->Confirm(Nym& PAYER_NYM,
+                                             Nym *
     pMERCHANT_NYM=nullptr,
                                              OTIdentifier *
     p_id_MERCHANT_NYM=nullptr);
@@ -367,7 +367,7 @@ public:
     /*
      From Contract, I have:
 
-     virtual bool SignContract (const OTPseudonym& theNym);
+     virtual bool SignContract (const Nym& theNym);
 
      */
     EXPORT bool SendNoticeToAllParties(
@@ -383,7 +383,7 @@ public:
         OTString pstrAttachment = String::Factory(),
         Nym* pActualNym = nullptr) const;
 
-    // Nym receives an OTItem::acknowledgment or OTItem::rejection.
+    // Nym receives an Item::acknowledgment or Item::rejection.
     EXPORT static bool DropServerNoticeToNymbox(
         const api::Core& core,
         bool bSuccessMsg,

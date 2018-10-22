@@ -291,7 +291,7 @@ std::pair<RequestNumber, std::unique_ptr<Message>> ServerContext::
     auto output = initialize_server_command(
         lock, type, provided, withAcknowledgments, withNymboxHash);
     auto& [requestNumber, message] = output;
-    const auto& notUsed [[maybe_unused]] = requestNumber;
+    const auto& notUsed[[maybe_unused]] = requestNumber;
 
     message->m_ascPayload = payload;
     message->m_strAcctID = String::Factory(accountID);
@@ -692,15 +692,15 @@ TransactionNumber ServerContext::update_highest(
 
     if (!good.empty()) {
         if (0 != oldHighest) {
-            otOut << OT_METHOD << __FUNCTION__
-                  << ": Raising Highest Transaction Number "
-                  << "from " << oldHighest << " to " << highest << "."
-                  << std::endl;
+            LogNormal(OT_METHOD)(__FUNCTION__)(
+                ": Raising Highest Transaction Number "
+                "from ")(oldHighest)(" to ")(highest)(".")
+                .Flush();
         } else {
-            otOut << OT_METHOD << __FUNCTION__
-                  << ": Creating Highest Transaction Number "
-                  << "entry for this server as '" << highest << "'."
-                  << std::endl;
+            LogNormal(OT_METHOD)(__FUNCTION__)(
+                ": Creating Highest Transaction Number "
+                "entry for this server as '")(highest)("'.")
+                .Flush();
         }
 
         highest_transaction_number_.store(highest);
@@ -744,13 +744,15 @@ void ServerContext::validate_number_set(
 {
     for (const auto& it : input) {
         if (it <= limit) {
-            otWarn << OT_METHOD << __FUNCTION__ << ": New transaction number is"
-                   << " less-than-or-equal-to last known 'highest trans number'"
-                   << " record. (Must be seeing the same server reply for a "
-                   << "second time, due to a receipt in my Nymbox.) FYI, last "
-                   << "known 'highest' number received: " << limit
-                   << " (Current 'violator': " << it << ") Skipping..."
-                   << std::endl;
+            LogDetail(OT_METHOD)(__FUNCTION__)(
+                ": New transaction number is"
+                " less-than-or-equal-to last known 'highest trans number'"
+                " record. (Must be seeing the same server reply for a "
+                "second time, due to a receipt in my Nymbox.) FYI, last "
+                "known 'highest' number received: ")(limit)(
+                " (Current 'violator': ")(it)(") Skipping...")
+                .Flush();
+            ;
             bad.insert(it);
         } else {
             good.insert(it);
@@ -852,9 +854,9 @@ bool ServerContext::Verify(const TransactionStatement& statement) const
         const bool missing = (1 != statement.Issued().count(number));
 
         if (missing) {
-            otOut << OT_METHOD << __FUNCTION__ << ": Issued transaction # "
-                  << number << " on context not found on statement."
-                  << std::endl;
+            LogNormal(OT_METHOD)(__FUNCTION__)(": Issued transaction # ")(
+                number)(" on context not found on statement.")
+                .Flush();
 
             return false;
         }

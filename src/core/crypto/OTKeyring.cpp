@@ -212,10 +212,12 @@ bool OTKeyring::Windows_RetrieveSecret(
          ascFileContents.LoadFromFile(strFoldername, strUser) &&
          ascFileContents.Exists());
     if (!bLoaded) {
-        otWarn << "%s: No cached ciphertext of master key loaded during "
-                  "attempted retrieval. "
-                  "(However, once one is available, it WILL be cached using "
-                  "DPAPI.) \n";
+        LogDetail(OT_METHOD)(__FUNCTION__)(
+            ": No cached ciphertext of master key loaded during "
+            "attempted retrieval. "
+            "(However, once one is available, it WILL be cached using "
+            "DPAPI).")
+            .Flush();
         return false;
     }
     // Below this point, we know for sure the ciphertext of the master
@@ -727,7 +729,7 @@ bool OTKeyring::Gnome_StoreSecret(
         return bResult;
     }
 
-    otOut << "OTKeyring::Gnome_StoreSecret: No secret to store.\n";
+    LogNormal(OT_METHOD)(__FUNCTION__)(": No secret to store.").Flush();
 
     return false;
 }
@@ -864,9 +866,10 @@ bool OTKeyring::Gnome_RetrieveSecret(
 
     // Not an error: what if it just hasn't been set there yet?
     //
-    otOut << "OTKeyring::Gnome_RetrieveSecret: "
-          << "No secret found: gnome_keyring_find_password_sync: "
-          << gnome_keyring_result_to_message(theResult) << '\n';
+    LogNormal(OT_METHOD)(__FUNCTION__)(
+        ": No secret found: gnome_keyring_find_password_sync: ")(
+        gnome_keyring_result_to_message(theResult))(".")
+        .Flush();
 
     return false;
 }
@@ -1108,7 +1111,7 @@ bool OTKeyring::KWallet_RetrieveSecret(
 
     // Not an error: what if it just hasn't been set there yet?
     //
-    otWarn << "OTKeyring::KWallet_RetrieveSecret: No secret found.\n";
+    LogDetail(OT_METHOD)(__FUNCTION__)(": No secret found.").Flush();
 
     return false;
 }
@@ -1249,9 +1252,10 @@ bool OTKeyring::FlatFile_RetrieveSecret(
 
     // Not an error: what if it just hasn't been set there yet?
     //
-    otWarn << __FUNCTION__
-           << ": Unable to retrieve any derived key, since "
-              "password_folder not provided in config file.\n";
+    LogDetail(OT_METHOD)(__FUNCTION__)(
+        ": Unable to retrieve any derived key, since "
+        "password_folder not provided in config file.")
+        .Flush();
 
     return false;
 }
@@ -1301,8 +1305,7 @@ bool OTKeyring::FlatFile_DeleteSecret(
                   << str_ExactPath.c_str() << '\n';
         } else {
             bSuccess = true;
-            LogVerbose(OT_METHOD)(__FUNCTION__)(
-                ": ** Success ")(
+            LogVerbose(OT_METHOD)(__FUNCTION__)(": ** Success ")(
                 "deleting file: ")(str_ExactPath.c_str())
                 .Flush();
         }

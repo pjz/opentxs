@@ -22,7 +22,7 @@
 #include "opentxs/core/Identifier.hpp"
 #include "opentxs/core/Log.hpp"
 #include "opentxs/core/Nym.hpp"
-#include "opentxs/core/OTStringXML.hpp"
+#include "opentxs/core/StringXML.hpp"
 #include "opentxs/core/String.hpp"
 
 #include <irrxml/irrXML.hpp>
@@ -178,18 +178,13 @@ std::int32_t OTTrade::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
             m_lTransactionNum)("Completed # of Trades: ")(tradesAlreadyDone_)
             .Flush();
 
-        otWarn << " Creation Date: " << creation
-               << "   Valid From: " << validFrom << "\n Valid To: " << validTo
-               << "\n"
-                  " instrumentDefinitionID: "
-               << instrumentDefinitionID << "\n assetAcctID: " << assetAcctID
-               << "\n"
-                  " NotaryID: "
-               << notaryID << "\n NymID: " << nymID
-               << "\n "
-                  " currencyTypeID: "
-               << currencyTypeID << "\n currencyAcctID: " << currencyAcctID
-               << "\n ";
+        LogDetail(OT_METHOD)(__FUNCTION__)(": Creation Date: ")(creation)(
+            " Valid From: ")(validFrom)(" Valid To: ")(validTo)(
+            " assetTypeID: ")(instrumentDefinitionID)(" assetAccountID: ")(
+            assetAcctID)(" NotaryID: ")(notaryID)(" NymID: ")(nymID)(
+            " currencyTypeID: ")(currencyTypeID)(" currencyAccountID: ")(
+            currencyAcctID)
+            .Flush();
 
         returnVal = 1;
     }
@@ -250,7 +245,7 @@ std::int32_t OTTrade::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
 void OTTrade::UpdateContents()
 {
     // I release this because I'm about to repopulate it.
-    m_xmlUnsigned.Release();
+    m_xmlUnsigned->Release();
 
     const auto NOTARY_ID = String::Factory(GetNotaryID()),
                NYM_ID = String::Factory(GetSenderNymID()),
@@ -307,7 +302,7 @@ void OTTrade::UpdateContents()
     std::string str_result;
     tag.output(str_result);
 
-    m_xmlUnsigned.Concatenate("%s", str_result.c_str());
+    m_xmlUnsigned->Concatenate("%s", str_result.c_str());
 }
 
 // The trade stores a copy of the Offer in string form.
@@ -440,9 +435,9 @@ OTOffer* OTTrade::GetOffer(Identifier& offerMarketId, OTMarket** market)
 
     // Couldn't find (or create) the market.
     if (false == bool(pMarket)) {
-        otOut
-            << "OTTrade::" << __FUNCTION__
-            << ": Unable to find or create market within requested parameters.";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Unable to find or create market within requested parameters.")
+            .Flush();
         return nullptr;
     }
 
@@ -736,18 +731,19 @@ bool OTTrade::CanRemoveItemFromCron(const ClientContext& context)
     if (!context.Nym()->CompareID(GetSenderNymID())) {
         LogInsane(OT_METHOD)(__FUNCTION__)(
             ": nym is not the originator of this CronItem. (He could be a "
-            "recipient though, so this is normal.)")
+            "recipient though, so this is normal).")
             .Flush();
 
         return false;
     }
     // By this point, that means nym is DEFINITELY the originator (sender)...
     else if (GetCountClosingNumbers() < 2) {
-        otOut
-            << "OTTrade::CanRemoveItem Weird: Sender tried to remove a market "
-               "trade; expected at "
-               "least 2 closing numbers to be available--that weren't. (Found "
-            << GetCountClosingNumbers() << ").\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Weird: Sender tried to remove a market "
+            "trade; expected at "
+            "least 2 closing numbers to be available--that weren't. (Found ")(
+            GetCountClosingNumbers())(").")
+            .Flush();
 
         return false;
     }
@@ -755,15 +751,17 @@ bool OTTrade::CanRemoveItemFromCron(const ClientContext& context)
     const auto notaryID = String::Factory(GetNotaryID());
 
     if (!context.VerifyIssuedNumber(GetAssetAcctClosingNum())) {
-        otOut << "OTTrade::CanRemoveItemFromCron: Closing number didn't verify "
-                 "for asset account.\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Closing number didn't verify "
+                                           "for asset account.")
+            .Flush();
 
         return false;
     }
 
     if (!context.VerifyIssuedNumber(GetCurrencyAcctClosingNum())) {
-        otOut << "OTTrade::CanRemoveItemFromCron: Closing number didn't verify "
-                 "for currency account.\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Closing number didn't verify "
+                                           "for currency account.")
+            .Flush();
 
         return false;
     }
@@ -848,9 +846,9 @@ void OTTrade::onFinalReceipt(
     //          1. ORIGINAL (user-signed) Cron Items are always stored "in
     // reference to" on cron receipts in the Inbox (an OTTransaction).
     //          2. The UPDATED VERSION of that same cron item (a trade or
-    // payment plan) is stored in the ATTACHMENT on the OTItem member.
+    // payment plan) is stored in the ATTACHMENT on the Item member.
     //          3. ADDITIONAL INFORMATION is stored in the NOTE field of the
-    // OTItem member.
+    // Item member.
     //
     // Unfortunately, marketReceipt doesn't adhere to this convention, as it
     // stores the Updated Cron Item (the trade) in
@@ -1058,7 +1056,7 @@ bool OTTrade::ProcessCron()
 
         else  // Process it!  <===================
         {
-            otInfo << "Processing trade: " << GetTransactionNum() << ".\n";
+            LogVerbose("Processing trade: ")(GetTransactionNum()).Flush();
 
             bStayOnMarket = market->ProcessTrade(api_.Wallet(), *this, *offer);
             // No need to save the Trade or Offer, since they will

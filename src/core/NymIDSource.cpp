@@ -63,7 +63,7 @@ NymIDSource::NymIDSource(
 }
 
 NymIDSource::NymIDSource(const api::Factory& factory, const String& source)
-    : NymIDSource(factory, *ExtractArmoredSource(Armored(source)))
+    : NymIDSource(factory, *ExtractArmoredSource(Armored::Factory(source)))
 {
 }
 
@@ -279,10 +279,7 @@ bool NymIDSource::Sign(
 
 OTString NymIDSource::asString() const
 {
-    auto dataSource = asData();
-    Armored armoredSource(dataSource);
-
-    return armoredSource;
+    return OTString(Armored::Factory(asData()));
 }
 
 // static

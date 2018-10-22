@@ -154,8 +154,9 @@ Wallet::AccountLock& Wallet::account(
         OT_ASSERT(pAccount);
     } else {
         if (false == create) {
-            otWarn << OT_METHOD << __FUNCTION__ << ": Trying to load account "
-                   << account.str() << " via legacy method." << std::endl;
+            LogDetail(OT_METHOD)(__FUNCTION__)(": Trying to load account ")(
+                account)(" via legacy method.")
+                .Flush();
             const auto legacy = load_legacy_account(account, rowLock, row);
 
             if (legacy) { return row; }
@@ -382,8 +383,7 @@ std::string Wallet::CreateNymHD(
             break;
         }
         default: {
-            otOut << OT_METHOD << __FUNCTION__ << ": Invalid nym type."
-                  << std::endl;
+            LogNormal(OT_METHOD)(__FUNCTION__)(": Invalid nym type.").Flush();
 
             return {};
         }
@@ -402,8 +402,8 @@ std::string Wallet::CreateNymHD(
     auto nym = Nym(nymParameters, type, name);
 
     if (nullptr == nym) {
-        otOut << OT_METHOD << __FUNCTION__ << ": Failed trying to create Nym."
-              << std::endl;
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Failed trying to create Nym.")
+            .Flush();
 
         return {};
     }
@@ -426,10 +426,10 @@ std::string Wallet::CreateNymHD(
 
     return nym->ID().str();
 #else
-    otOut << OT_METHOD << __FUNCTION__ << ": No support for HD key derivation."
-          << std::endl;
+    LogNormal(OT_METHOD)(__FUNCTION__)(": No support for HD key derivation.")
+        .Flush()
 
-    return {};
+            return {};
 #endif
 }
 
@@ -1039,8 +1039,9 @@ ConstNym Wallet::Nym(const proto::CredentialIndex& serialized) const
     auto existing = Nym(nymID);
 
     if (existing && (existing->Revision() >= serialized.revision())) {
-        otWarn << OT_METHOD << __FUNCTION__
-               << ": Incoming nym is not newer than existing nym" << std::endl;
+        LogDetail(OT_METHOD)(__FUNCTION__)(
+            ": Incoming nym is not newer than existing nym")
+            .Flush();
 
         return existing;
     } else {
@@ -1051,8 +1052,8 @@ ConstNym Wallet::Nym(const proto::CredentialIndex& serialized) const
         candidate->LoadCredentialIndex(serialized);
 
         if (candidate->VerifyPseudonym()) {
-            otWarn << OT_METHOD << __FUNCTION__ << ": Saving updated nym " << id
-                   << std::endl;
+            LogDetail(OT_METHOD)(__FUNCTION__)(": Saving updated nym ")(id)
+                .Flush();
             candidate->WriteCredentials();
             SaveCredentialIDs(*candidate);
             Lock mapLock(nym_map_lock_);
@@ -1857,7 +1858,7 @@ bool Wallet::SaveCredentialIDs(const opentxs::Nym& nym) const
         return false;
     }
 
-    otWarn << "Credentials saved." << std::endl;
+    LogDetail(OT_METHOD)(__FUNCTION__)(": Credentials saved.").Flush();
 
     return true;
 }

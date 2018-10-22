@@ -36,7 +36,7 @@
 #include "opentxs/core/NymFile.hpp"
 #include "opentxs/core/NymIDSource.hpp"
 #include "opentxs/core/OTStorage.hpp"
-#include "opentxs/core/OTStringXML.hpp"
+#include "opentxs/core/StringXML.hpp"
 #include "opentxs/core/OTTransaction.hpp"
 #include "opentxs/core/String.hpp"
 #include "opentxs/crypto/key/Keypair.hpp"
@@ -155,10 +155,9 @@ bool NymFile::deserialize_nymfile(
     bool convert = false;
     converted = false;
     //?    ClearAll();  // Since we are loading everything up... (credentials
-    // are NOT
-    // cleared here. See note in OTPseudonym::ClearAll.)
-    OTStringXML strNymXML(strNym);  // todo optimize
-    irr::io::IrrXMLReader* xml = irr::io::createIrrXMLReader(strNymXML);
+    // are NOT cleared here. See note in Nym::ClearAll.)
+    auto strNymXML = StringXML::Factory(strNym);  // todo optimize
+    irr::io::IrrXMLReader* xml = irr::io::createIrrXMLReader(strNymXML.get());
     OT_ASSERT(nullptr != xml);
     std::unique_ptr<irr::io::IrrXMLReader> theCleanup(xml);
 
@@ -207,9 +206,10 @@ bool NymFile::deserialize_nymfile(
                               << ": Converting nymfile with version "
                               << m_strVersion << std::endl;
                     } else {
-                        otWarn << __FUNCTION__
-                               << ": Not converting nymfile because version is "
-                               << m_strVersion << std::endl;
+                        LogDetail(OT_METHOD)(__FUNCTION__)(
+                            ": Not converting nymfile because version is ")(
+                            m_strVersion)
+                            .Flush();
                     }
                 } else if (strNodeName->Compare("nymIDSource")) {
                     // noop
@@ -495,8 +495,9 @@ bool NymFile::load_signed_nymfile(const T& lock)
     auto theNymFile = api_.Factory().SignedFile(OTFolders::Nym(), nymID);
 
     if (!theNymFile->LoadFile()) {
-        otWarn << __FUNCTION__ << ": Failed loading a signed nymfile: " << nymID
-               << std::endl;
+        LogDetail(OT_METHOD)(__FUNCTION__)(
+            ": Failed loading a signed nymfile: ")(nymID)
+            .Flush();
 
         return false;
     }

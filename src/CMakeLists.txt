@@ -53,7 +53,7 @@ endif()
 if(OT_BUNDLED_OPENTXS_PROTO)
   set(bundled-opentxs-proto
     $<TARGET_OBJECTS:opentxs-proto-objects>
-    $<TARGET_OBJECTS:opentxs-verify>
+    $<TARGET_OBJECTS:verify>
   )
 else()
   set(bundled-opentxs-proto "")
@@ -81,7 +81,7 @@ if(OT_BUNDLED_PROTOBUF)
 
   if(OT_BUNDLED_OPENTXS_PROTO)
     add_dependencies(opentxs-proto-objects protobuf)
-    add_dependencies(opentxs-verify protobuf)
+    add_dependencies(verify protobuf)
   endif()
 
   add_dependencies(otprotob protobuf)
@@ -314,6 +314,10 @@ if(OT_SHARED)
       target_link_libraries(${MODULE_NAME} PRIVATE ${SQLITE3_LIBRARIES})
   endif()
 
+  if (OT_STORAGE_LMDB)
+      target_link_libraries(${MODULE_NAME} PRIVATE ${LMDB_LIBRARIES})
+  endif()
+
   if (OT_STORAGE_FS)
       target_link_libraries(${MODULE_NAME} PRIVATE ${Boost_SYSTEM_LIBRARIES} ${Boost_FILESYSTEM_LIBRARIES} ${Boost_IOSTREAMS_LIBRARIES})
   endif()
@@ -377,6 +381,10 @@ if(OT_STATIC)
 
   if (OT_STORAGE_SQLITE AND NOT OT_BUNDLED_SQLITE)
       target_link_libraries(${MODULE_NAME}_static PRIVATE ${SQLITE3_LIBRARIES})
+  endif()
+
+  if (OT_STORAGE_LMDB)
+    target_link_libraries(${MODULE_NAME}_static PRIVATE ${LMDB_LIBRARIES})
   endif()
 
   if (OT_STORAGE_FS)

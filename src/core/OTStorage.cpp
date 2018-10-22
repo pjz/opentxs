@@ -497,8 +497,9 @@ bool Exists(
     Storage* pStorage = details::s_pStorage;
 
     if (nullptr == pStorage) {
-        otOut << "OTDB::" << __FUNCTION__
-              << ": details::s_pStorage is null. (Returning false.)\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": details::s_pStorage is null. (Returning false.).")
+            .Flush();
         return false;
     }
 
@@ -531,8 +532,9 @@ std::int64_t FormPathString(
     Storage* pStorage = details::s_pStorage;
 
     if (nullptr == pStorage) {
-        otOut << "OTDB::" << __FUNCTION__
-              << ": details::s_pStorage is null. (Returning -1.)\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": details::s_pStorage is null. (Returning -1).")
+            .Flush();
         return -1;
     }
 
@@ -2706,8 +2708,9 @@ ot_exit_block:
             return -4;
         }
         if (!bMakePath && !bFolderExists) {
-            otWarn << __FUNCTION__
-                   << ": Debug: Cannot find Folder: " << strFolder << " \n";
+            LogDetail(OT_METHOD)(__FUNCTION__)(": Debug: Cannot find Folder: ")(
+                strFolder)
+                .Flush();
         }
     }
 

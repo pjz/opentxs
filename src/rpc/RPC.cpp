@@ -20,6 +20,7 @@
 #include "opentxs/api/Wallet.hpp"
 #include "opentxs/client/NymData.hpp"
 #include "opentxs/client/OT_API.hpp"
+#include "opentxs/client/OTAPI_Exec.hpp"
 #include "opentxs/client/ServerAction.hpp"
 #include "opentxs/contact/ContactData.hpp"
 #include "opentxs/contact/Contact.hpp"
@@ -42,13 +43,16 @@
 
 #include "internal/rpc/Internal.hpp"
 
+#include <algorithm>
+
 #include "RPC.hpp"
 
-#define SESSION_DATA_VERSION 1
 #define ACCOUNTEVENT_VERSION 1
 #define ACCOUNTDATA_VERSION 1
 #define RPCTASK_VERSION 1
 #define RPCSTATUS_VERSION 1
+#define SEED_VERSION 1
+#define SESSION_DATA_VERSION 1
 
 #define OT_METHOD "opentxs::rpc::implementation::RPC::"
 
@@ -897,13 +901,19 @@ proto::RPCResponse RPC::get_compatible_accounts(
     }
 
     const auto& unitdefinitionid = cheque->GetInstrumentDefinitionID();
+    const auto owneraccounts = client.Storage().AccountsByOwner(ownerID);
+    const auto unitaccounts =
+        client.Storage().AccountsByContract(unitdefinitionid);
+    std::vector<OTIdentifier> compatible{};
+    std::set_union(
+        owneraccounts.begin(),
+        owneraccounts.end(),
+        unitaccounts.begin(),
+        unitaccounts.end(),
+        std::back_inserter(compatible));
 
-    const auto accounts = client.Storage().AccountsByOwner(ownerID);
-    for (auto accountid : accounts) {
-        const auto& account = client.Wallet().Account(accountid);
-        if (unitdefinitionid == account.get().GetInstrumentDefinitionID()) {
-            output.add_identifier(accountid->str());
-        }
+    for (const auto& accountid : compatible) {
+        output.add_identifier(accountid->str());
     }
 
     if (0 == output.identifier_size()) {
@@ -1059,6 +1069,7 @@ proto::RPCResponse RPC::get_seeds(const proto::RPCCommand& command) const
         auto passphrase = hdseeds.Passphrase(id);
         if (false == words.empty() || false == passphrase.empty()) {
             auto& seed = *output.add_seed();
+            seed.set_version(SEED_VERSION);
             seed.set_id(id);
             seed.set_words(words);
             seed.set_passphrase(passphrase);
@@ -1114,6 +1125,42 @@ const api::Core& RPC::get_session(const std::int32_t instance) const
     } else {
         return ot_.Client(get_index(instance));
     }
+}
+
+proto::RPCResponse RPC::get_workflow(const proto::RPCCommand& command) const
+{
+    auto output = init(command);
+
+    if (!is_session_valid(command.session())) {
+        add_output_status(output, proto::RPCRESPONSE_BAD_SESSION);
+        return output;
+    }
+
+    if (!is_client_session(command.session())) {
+        add_output_status(output, proto::RPCRESPONSE_INVALID);
+        return output;
+    }
+
+    auto& client = *get_client(command.session());
+
+    for (const auto& getworkflow : command.getworkflow()) {
+        const auto workflow = client.Workflow().LoadWorkflow(
+            Identifier::Factory(getworkflow.nymid()),
+            Identifier::Factory(getworkflow.workflowid()));
+
+        if (workflow) {
+            auto& paymentworkflow = *output.add_workflow();
+            paymentworkflow = *workflow;
+        }
+    }
+
+    if (0 == output.workflow_size()) {
+        add_output_status(output, proto::RPCRESPONSE_NONE);
+    } else {
+        add_output_status(output, proto::RPCRESPONSE_SUCCESS);
+    }
+
+    return output;
 }
 
 proto::RPCResponse RPC::import_seed(const proto::RPCCommand& command) const
@@ -1594,6 +1641,9 @@ proto::RPCResponse RPC::Process(const proto::RPCCommand& command) const
         case proto::RPCCOMMAND_CREATECOMPATIBLEACCOUNT: {
             return create_compatible_account(command);
         } break;
+        case proto::RPCCOMMAND_GETWORKFLOW: {
+            return get_workflow(command);
+        } break;
         case proto::RPCCOMMAND_ERROR:
         default: {
             otErr << OT_METHOD << __FUNCTION__ << ": Unsupported command"
@@ -1710,7 +1760,14 @@ proto::RPCResponse RPC::send_payment(const proto::RPCCommand& command) const
         return output;
     }
 
-    auto sender = client.Storage().AccountOwner(sourceaccountid);
+    const auto sender = client.Storage().AccountOwner(sourceaccountid);
+
+    if (sender->empty()) {
+        add_output_status(output, proto::RPCRESPONSE_ERROR);
+
+        return output;
+    }
+
     const auto ready = client.Sync().CanMessage(sender, contactid);
 
     switch (ready) {
@@ -1766,7 +1823,18 @@ proto::RPCResponse RPC::send_payment(const proto::RPCCommand& command) const
                 if (false == bool(reply) || false == reply->m_bSuccess) {
                     add_output_status(output, proto::RPCRESPONSE_ERROR);
                 } else {
-                    add_output_status(output, proto::RPCRESPONSE_SUCCESS);
+                    std::string strReply = String::Factory(*reply)->Get();
+                    auto transuccess =
+                        client.Exec().Message_GetTransactionSuccess(
+                            notary->str(),
+                            sender->str(),
+                            sourceaccountid->str(),
+                            strReply);
+                    if (1 == transuccess) {
+                        add_output_status(output, proto::RPCRESPONSE_SUCCESS);
+                    } else {
+                        add_output_status(output, proto::RPCRESPONSE_ERROR);
+                    }
                 }
             } else {
                 add_output_status(output, proto::RPCRESPONSE_ERROR);
@@ -1820,8 +1888,12 @@ proto::RPCResponse RPC::start_server(const proto::RPCCommand& command) const
     try {
         auto& manager = ot_.StartServer(get_args(command.arg()), session);
         instance = manager.Instance();
+    } catch (const std::invalid_argument& e) {
+        add_output_status(output, proto::RPCRESPONSE_ERROR);
+        return output;
     } catch (...) {
         add_output_status(output, proto::RPCRESPONSE_INVALID);
+        return output;
     }
 
     output.set_session(instance);

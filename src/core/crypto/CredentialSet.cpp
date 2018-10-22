@@ -145,8 +145,9 @@ CredentialSet::CredentialSet(
 
 #if OT_CRYPTO_SUPPORTED_KEY_ED25519
     if (!haveChildCredential) {
-        otOut << __FUNCTION__ << ": Creating an ed25519 child key credential."
-              << std::endl;
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Creating an ed25519 child key credential.")
+            .Flush();
         revisedParameters.setNymParameterType(NymParameterType::ED25519);
         haveChildCredential = !AddChildKeyCredential(revisedParameters).empty();
     }
@@ -154,8 +155,9 @@ CredentialSet::CredentialSet(
 
 #if OT_CRYPTO_SUPPORTED_KEY_SECP256K1
     if (!haveChildCredential) {
-        otOut << __FUNCTION__ << ": Creating an secp256k1 child key credential."
-              << std::endl;
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Creating an secp256k1 child key credential.")
+            .Flush();
         revisedParameters.setNymParameterType(NymParameterType::SECP256K1);
         haveChildCredential = !AddChildKeyCredential(revisedParameters).empty();
     }
@@ -163,8 +165,9 @@ CredentialSet::CredentialSet(
 
 #if OT_CRYPTO_SUPPORTED_KEY_RSA
     if (!haveChildCredential) {
-        otOut << __FUNCTION__ << ": Creating an RSA child key credential."
-              << std::endl;
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Creating an RSA child key credential.")
+            .Flush();
         revisedParameters.setNymParameterType(NymParameterType::RSA);
         haveChildCredential = !AddChildKeyCredential(revisedParameters).empty();
     }
@@ -190,7 +193,7 @@ bool CredentialSet::Path(proto::HDPath& output) const
 
 std::int32_t CredentialSet::GetPublicKeysBySignature(
     crypto::key::Keypair::Keys& listOutput,
-    const OTSignature& theSignature,
+    const Signature& theSignature,
     char cKeyType) const  // 'S' (signing key) or 'E' (encryption key)
                           // or 'A' (authentication key)
 {
@@ -217,8 +220,9 @@ std::int32_t CredentialSet::GetPublicKeysBySignature(
 bool CredentialSet::VerifyInternally() const
 {
     if (!m_MasterCredential) {
-        otOut << __FUNCTION__
-              << ": This credential set does not have a master credential.\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": This credential set does not have a master credential.")
+            .Flush();
         return false;
     }
 
@@ -226,9 +230,10 @@ bool CredentialSet::VerifyInternally() const
     // NymID and MasterID in the CredentialSet match the master
     // credentials's versions.
     if (!(m_MasterCredential->Validate())) {
-        otOut << __FUNCTION__
-              << ": Master Credential failed to verify: " << GetMasterCredID()
-              << "\nNymID: " << GetNymID() << "\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Master Credential failed to verify: ")(GetMasterCredID())(
+            " NymID: ")(GetNymID())(".")
+            .Flush();
         return false;
     }
 
@@ -240,9 +245,10 @@ bool CredentialSet::VerifyInternally() const
         OT_ASSERT(pSub);
 
         if (!pSub->Validate()) {
-            otOut << __FUNCTION__
-                  << ": Child credential failed to verify: " << str_sub_id
-                  << "\nNymID: " << GetNymID() << "\n";
+            LogNormal(OT_METHOD)(__FUNCTION__)(
+                ": Child credential failed to verify: ")(str_sub_id)(
+                " NymID: ")(GetNymID())(".")
+                .Flush();
 
             return false;
         }
@@ -839,7 +845,7 @@ void CredentialSet::ClearChildCredentials() { m_mapCredentials.clear(); }
 // serializing them.
 // bShowRevoked allows us to include/exclude the revoked credentials from
 // the output (filter for valid-only.) bValid=true means we are saving
-// OTPseudonym::m_mapCredentials. Whereas bValid=false means we're saving
+// Nym::m_mapCredentials. Whereas bValid=false means we're saving
 // m_mapRevoked. pmapPubInfo is optional output, the public info for all the
 // credentials will be placed inside, if a pointer is provided.
 //
@@ -1054,8 +1060,8 @@ void CredentialSet::RevokeVerificationCredentials(
 
 bool CredentialSet::AddContactCredential(const proto::ContactData& contactData)
 {
-    otOut << OT_METHOD << __FUNCTION__ << ": Adding a contact credential."
-          << std::endl;
+    LogNormal(OT_METHOD)(__FUNCTION__)(": Adding a contact credential.")
+        .Flush();
 
     if (!m_MasterCredential) { return false; }
 
@@ -1081,8 +1087,8 @@ bool CredentialSet::AddContactCredential(const proto::ContactData& contactData)
 bool CredentialSet::AddVerificationCredential(
     const proto::VerificationSet& verificationSet)
 {
-    otOut << OT_METHOD << __FUNCTION__ << ": Adding a verification credential."
-          << std::endl;
+    LogNormal(OT_METHOD)(__FUNCTION__)(": Adding a verification credential.")
+        .Flush();
 
     if (!m_MasterCredential) { return false; }
 

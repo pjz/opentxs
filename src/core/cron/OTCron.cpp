@@ -23,7 +23,7 @@
 #include "opentxs/core/Identifier.hpp"
 #include "opentxs/core/Log.hpp"
 #include "opentxs/core/OTStorage.hpp"
-#include "opentxs/core/OTStringXML.hpp"
+#include "opentxs/core/StringXML.hpp"
 #include "opentxs/core/String.hpp"
 
 #include <irrxml/irrXML.hpp>
@@ -368,15 +368,18 @@ std::int32_t OTCron::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
 
         m_NOTARY_ID->SetString(strNotaryID);
 
-        otOut << "\n\nLoading OTCron for NotaryID: " << strNotaryID << "\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Loading OTCron for NotaryID: ")(
+            strNotaryID)(".")
+            .Flush();
 
         nReturnVal = 1;
     } else if (!strcmp("transactionNum", xml->getNodeName())) {
         const std::int64_t lTransactionNum =
             String::StringToLong(xml->getAttributeValue("value"));
 
-        otWarn << "Transaction Number " << lTransactionNum
-               << " available for Cron.\n";
+        LogDetail(OT_METHOD)(__FUNCTION__)(": Transaction Number ")(
+            lTransactionNum)(" available for Cron.")
+            .Flush();
 
         AddTransactionNumber(lTransactionNum);  // This doesn't save to disk.
         // Make sure to save Cron when it
@@ -464,7 +467,9 @@ std::int32_t OTCron::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
                                Identifier::Factory(strInstrumentDefinitionID),
                            CURRENCY_ID = Identifier::Factory(strCurrencyID);
 
-        otWarn << "Loaded cron entry for Market:\n" << strMarketID << ".\n";
+        LogDetail(OT_METHOD)(__FUNCTION__)(": Loaded cron entry for Market: ")(
+            strMarketID)(".")
+            .Flush();
 
         // LoadMarket() needs this info to do its thing.
         auto pMarket{api_.Factory().Market(
@@ -487,8 +492,10 @@ std::int32_t OTCron::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
                      "while loading Cron file.\n";
             return (-1);
         } else {
-            otWarn << "Loaded market entry from cronfile, and also loaded the "
-                      "market file itself.\n";
+            LogDetail(OT_METHOD)(__FUNCTION__)(
+                ": Loaded market entry from cronfile, and also loaded the "
+                "market file itself.")
+                .Flush();
         }
         nReturnVal = 1;
     }
@@ -499,7 +506,7 @@ std::int32_t OTCron::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
 void OTCron::UpdateContents()
 {
     // I release this because I'm about to repopulate it.
-    m_xmlUnsigned.Release();
+    m_xmlUnsigned->Release();
 
     const auto NOTARY_ID = String::Factory(m_NOTARY_ID);
 
@@ -558,7 +565,7 @@ void OTCron::UpdateContents()
     std::string str_result;
     tag.output(str_result);
 
-    m_xmlUnsigned.Concatenate("%s", str_result.c_str());
+    m_xmlUnsigned->Concatenate("%s", str_result.c_str());
 }
 
 std::int64_t OTCron::computeTimeout()
@@ -628,8 +635,9 @@ void OTCron::ProcessCronItems()
         }
         pItem->HookRemovalFromCron(
             api_.Wallet(), nullptr, GetNextTransactionNumber());
-        otOut << "OTCron::" << __FUNCTION__
-              << ": Removing cron item: " << pItem->GetTransactionNum() << "\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Removing cron item: ")(
+            pItem->GetTransactionNum())(".")
+            .Flush();
         it = m_multimapCronItems.erase(it);
         auto it_map = FindItemOnMap(pItem->GetTransactionNum());
         OT_ASSERT(m_mapCronItems.end() != it_map);
@@ -734,9 +742,10 @@ bool OTCron::AddCronItem(
             bSuccess = SaveCron();
 
             if (bSuccess)
-                otOut << __FUNCTION__
-                      << ": New CronItem has been added to Cron: "
-                      << theItem->GetTransactionNum() << "\n";
+                LogNormal(OT_METHOD)(__FUNCTION__)(
+                    ": New CronItem has been added to Cron: ")(
+                    theItem->GetTransactionNum())(".")
+                    .Flush();
             else
                 otErr << __FUNCTION__
                       << ": Error saving while adding new CronItem to Cron: "
@@ -1023,7 +1032,9 @@ std::shared_ptr<OTMarket> OTCron::GetOrCreateMarket(
                                             // since it was created new.
 
     if (bAdded) {
-        otOut << "New market created and added to Cron.\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            "New market created and added to Cron.")
+            .Flush();
     } else {
         otErr << "Error trying to add new market to Cron.\n";
     }

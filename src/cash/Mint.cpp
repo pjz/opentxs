@@ -21,7 +21,7 @@
 #include "opentxs/core/Log.hpp"
 #include "opentxs/core/Message.hpp"
 #include "opentxs/core/OTStorage.hpp"
-#include "opentxs/core/OTStringXML.hpp"
+#include "opentxs/core/StringXML.hpp"
 #include "opentxs/core/String.hpp"
 
 #include <irrxml/irrXML.hpp>
@@ -133,18 +133,8 @@ bool Mint::Expired() const
 
 void Mint::ReleaseDenominations()
 {
-    while (!m_mapPublic.empty()) {
-        Armored* pArmor = m_mapPublic.begin()->second;
-        m_mapPublic.erase(m_mapPublic.begin());
-        delete pArmor;
-        pArmor = nullptr;
-    }
-    while (!m_mapPrivate.empty()) {
-        Armored* pArmor = m_mapPrivate.begin()->second;
-        m_mapPrivate.erase(m_mapPrivate.begin());
-        delete pArmor;
-        pArmor = nullptr;
-    }
+    m_mapPublic.clear();
+    m_mapPrivate.clear();
 }
 
 // If you want to load a certain Mint from string, then
@@ -188,7 +178,7 @@ void Mint::InitMint()
 
 bool Mint::LoadContract()
 {
-    otOut << "Mint::LoadContract OVERRIDE.\n";
+    LogNormal(OT_METHOD)(__FUNCTION__)(": OVERRIDE.").Flush();
     return LoadMint();
 }
 
@@ -241,9 +231,10 @@ bool Mint::LoadMint(const char* szAppend)  // todo: server should
 
     if (!OTDB::Exists(
             api_.DataFolder(), szFolder1name, szFolder2name, szFilename, "")) {
-        otOut << "Mint::LoadMint: File does not exist: " << szFolder1name
-              << Log::PathSeparator() << szFolder2name << Log::PathSeparator()
-              << szFilename << "\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": File does not exist: ")(
+            szFolder1name)(Log::PathSeparator())(szFolder2name)(
+            Log::PathSeparator())(szFilename)
+            .Flush();
         return false;
     }
 
@@ -408,35 +399,28 @@ bool Mint::VerifyContractID() const
 // Pass in the actual denomination such as 5, 10, 20, 50, 100...
 bool Mint::GetPrivate(Armored& theArmor, std::int64_t lDenomination)
 {
-    for (auto& it : m_mapPrivate) {
-        Armored* pArmor = it.second;
-        OT_ASSERT_MSG(
-            nullptr != pArmor, "nullptr mint pointer in Mint::GetPrivate.\n");
-        // if this denomination (say, 50) matches the one passed in
-        if (it.first == lDenomination) {
-            theArmor.Set(*pArmor);
-            return true;
-        }
+    try {
+        theArmor.Set(m_mapPrivate.at(lDenomination));
+
+        return true;
+    } catch (...) {
+
+        return false;
     }
-    return false;
 }
 
 // The mint has a different key pair for each denomination.
 // Pass in the actual denomination such as 5, 10, 20, 50, 100...
 bool Mint::GetPublic(Armored& theArmor, std::int64_t lDenomination)
 {
-    for (auto& it : m_mapPublic) {
-        Armored* pArmor = it.second;
-        OT_ASSERT_MSG(
-            nullptr != pArmor, "nullptr mint pointer in Mint::GetPublic.\n");
-        // if this denomination (say, 50) matches the one passed in
-        if (it.first == lDenomination) {
-            theArmor.Set(*pArmor);
-            return true;
-        }
-    }
+    try {
+        theArmor.Set(m_mapPublic.at(lDenomination));
 
-    return false;
+        return true;
+    } catch (...) {
+
+        return false;
+    }
 }
 
 // If you need to withdraw a specific amount, pass it in here and the
@@ -469,10 +453,6 @@ std::int64_t Mint::GetDenomination(std::int32_t nIndex)
 
     for (auto it = m_mapPublic.begin(); it != m_mapPublic.end();
          ++it, nIterateIndex++) {
-        Armored* pArmor = it->second;
-        OT_ASSERT_MSG(
-            nullptr != pArmor,
-            "nullptr mint pointer in Mint::GetDenomination.\n");
 
         if (nIndex == nIterateIndex) return it->first;
     }
@@ -492,7 +472,7 @@ void Mint::UpdateContents()
          CASH_ACCOUNT_ID = String::Factory(m_CashAccountID);
 
     // I release this because I'm about to repopulate it.
-    m_xmlUnsigned.Release();
+    m_xmlUnsigned->Release();
 
     Tag tag("mint");
 
@@ -513,27 +493,15 @@ void Mint::UpdateContents()
                                          // SetSavePrivateKeys() to set it true.
 
             for (auto& it : m_mapPrivate) {
-                Armored* pArmor = it.second;
-                OT_ASSERT_MSG(
-                    nullptr != pArmor,
-                    "nullptr private mint pointer "
-                    "in "
-                    "Mint::UpdateContents.\n");
-
                 TagPtr tagPrivateInfo(
-                    new Tag("mintPrivateInfo", pArmor->Get()));
+                    new Tag("mintPrivateInfo", it.second->Get()));
                 tagPrivateInfo->add_attribute(
                     "denomination", formatLong(it.first));
                 tag.add_tag(tagPrivateInfo);
             }
         }
         for (auto& it : m_mapPublic) {
-            Armored* pArmor = it.second;
-            OT_ASSERT_MSG(
-                nullptr != pArmor,
-                "nullptr public mint pointer in Mint::UpdateContents.\n");
-
-            TagPtr tagPublicInfo(new Tag("mintPublicInfo", pArmor->Get()));
+            TagPtr tagPublicInfo(new Tag("mintPublicInfo", it.second->Get()));
             tagPublicInfo->add_attribute("denomination", formatLong(it.first));
             tag.add_tag(tagPublicInfo);
         }
@@ -542,7 +510,7 @@ void Mint::UpdateContents()
     std::string str_result;
     tag.output(str_result);
 
-    m_xmlUnsigned.Concatenate("%s", str_result.c_str());
+    m_xmlUnsigned->Concatenate("%s", str_result.c_str());
 }
 
 // return -1 if error, 0 if nothing, and 1 if the node was processed.
@@ -591,42 +559,31 @@ std::int32_t Mint::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
         std::int64_t nValidTo = OTTimeGetSecondsFromTime(m_VALID_TO);
         std::int64_t nExpiration = OTTimeGetSecondsFromTime(m_EXPIRATION);
 
-        otWarn <<
+        LogDetail(OT_METHOD)(__FUNCTION__)
             //    "\n===> Loading XML for mint into memory structures..."
-            "\n\nMint version: " << m_strVersion
-               << "\n Notary ID: " << strNotaryID
-               << "\n Instrument Definition ID: " << strInstrumentDefinitionID
-               << "\n Cash Acct ID: " << strCashAcctID
-               << "\n"
-                  ""
-               << ((false == m_CashAccountID->empty()) ? "SUCCESS" : "FAILURE")
-               << " loading Cash Account into memory for pointer: "
-                  "Mint::m_pReserveAcct\n"
-                  " Series: "
-               << m_nSeries << "\n Expiration: " << nExpiration
-               << "\n Valid From: " << nValidFrom << "\n Valid To: " << nValidTo
-               << "\n";
+            (": Mint version: ")(m_strVersion)(" Notary ID: ")(strNotaryID)(
+                " Instrument Definition ID: ")(strInstrumentDefinitionID)(
+                " Cash Acct ID: ")(strCashAcctID)(
+                (m_CashAccountID->empty()) ? "FAILURE" : "SUCCESS")(
+                " loading Cash Account into memory for pointer: ")(
+                "Mint::m_pReserveAcct ")(" Series: ")(m_nSeries)(
+                " Expiration: ")(nExpiration)(" Valid From: ")(nValidFrom)(
+                " Valid To: ")(nValidTo)
+                .Flush();
 
         nReturnVal = 1;
     } else if (strNodeName->Compare("mintPrivateInfo")) {
         std::int64_t lDenomination =
             String::StringToLong(xml->getAttributeValue("denomination"));
+        auto pArmor = Armored::Factory();
 
-        Armored* pArmor = new Armored;
-
-        OT_ASSERT(nullptr != pArmor);
-
-        if (!Contract::LoadEncodedTextField(xml, *pArmor) ||
-            !pArmor->Exists()) {
+        if (!Contract::LoadEncodedTextField(xml, pArmor) || !pArmor->Exists()) {
             otErr << "Error in Mint::ProcessXMLNode: mintPrivateInfo field "
                      "without value.\n";
 
-            delete pArmor;
-            pArmor = nullptr;
-
             return (-1);  // error condition
         } else {
-            m_mapPrivate[lDenomination] = pArmor;
+            m_mapPrivate.emplace(lDenomination, std::move(pArmor));
         }
 
         return 1;
@@ -634,25 +591,18 @@ std::int32_t Mint::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
         std::int64_t lDenomination =
             String::StringToLong(xml->getAttributeValue("denomination"));
 
-        Armored* pArmor = new Armored;
+        auto pArmor = Armored::Factory();
 
-        OT_ASSERT(nullptr != pArmor);
-
-        if (!Contract::LoadEncodedTextField(xml, *pArmor) ||
-            !pArmor->Exists()) {
+        if (!Contract::LoadEncodedTextField(xml, pArmor) || !pArmor->Exists()) {
             otErr << "Error in Mint::ProcessXMLNode: mintPublicInfo field "
                      "without value.\n";
 
-            delete pArmor;
-            pArmor = nullptr;
-
             return (-1);  // error condition
         } else {
-            m_mapPublic[lDenomination] = pArmor;
-            m_nDenominationCount++;  // Whether client or server, both sides
-                                     // have
-                                     // public. Each public denomination should
-                                     // increment this count.
+            m_mapPublic.emplace(lDenomination, std::move(pArmor));
+            // Whether client or server, both sides have public. Each public
+            // denomination should increment this count.
+            m_nDenominationCount++;
         }
 
         return 1;
@@ -672,14 +622,14 @@ std::int32_t Mint::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
  OTAccount::GenerateNewAccount)
  OTAccount * OTAccount::GenerateNewAccount(    const Identifier& theNymID,
  const Identifier& theNotaryID,
-                                            const OTPseudonym & theServerNym,
+                                            const Nym & theServerNym,
  const OTMessage & theMessage,
                                             const OTAccount::AccountType
  eAcctType=OTAccount::user)
 
 
  // The above method uses this one internally...
- bool OTAccount::GenerateNewAccount(const OTPseudonym & theServer, const
+ bool OTAccount::GenerateNewAccount(const Nym & theServer, const
  OTMessage & theMessage,
                                     const OTAccount::AccountType
  eAcctType=OTAccount::user)
@@ -736,9 +686,13 @@ void Mint::GenerateNewMint(
 
     if (account) {
         account.get().GetIdentifier(m_CashAccountID);
-        otOut << "Successfully created cash reserve account for new mint.\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Successfully created cash reserve account for new mint.")
+            .Flush();
     } else {
-        otErr << "Error creating cash reserve account for new mint.\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Error creating cash reserve account for new mint.")
+            .Flush();
     }
 
     account.Release();

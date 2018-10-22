@@ -78,7 +78,7 @@ namespace opentxs::crypto::key::implementation
 RSA::RSA()
     : Asymmetric(proto::AKEYTYPE_LEGACY, proto::KEYROLE_ERROR)
     , dp(new d())
-    , m_p_ascKey(nullptr)
+    , m_p_ascKey(Armored::Factory())
 {
     dp->backlink = this;
     dp->m_pX509 = nullptr;
@@ -88,7 +88,7 @@ RSA::RSA()
 RSA::RSA(const proto::KeyRole role)
     : Asymmetric(proto::AKEYTYPE_LEGACY, role)
     , dp(new d())
-    , m_p_ascKey(nullptr)
+    , m_p_ascKey(Armored::Factory())
 {
     dp->backlink = this;
     dp->m_pX509 = nullptr;
@@ -98,7 +98,7 @@ RSA::RSA(const proto::KeyRole role)
 RSA::RSA(const proto::AsymmetricKey& serializedKey)
     : Asymmetric(serializedKey)
     , dp(new d())
-    , m_p_ascKey(new Armored)
+    , m_p_ascKey(Armored::Factory())
 {
 
     dp->backlink = this;
@@ -119,7 +119,7 @@ RSA::RSA(const proto::AsymmetricKey& serializedKey)
 RSA::RSA(const String& publicKey)
     : Asymmetric()
     , dp(new d())
-    , m_p_ascKey(nullptr)
+    , m_p_ascKey(Armored::Factory())
 {
 
     dp->backlink = this;
@@ -139,31 +139,28 @@ RSA* RSA::clone() const
 
     OT_ASSERT(nullptr != key)
 
-    if (nullptr != m_p_ascKey) {
-        if (nullptr != key->m_p_ascKey) { delete key->m_p_ascKey; }
-
-        key->m_p_ascKey = new Armored(*m_p_ascKey);
-    }
+    key->m_p_ascKey = m_p_ascKey;
 
     return key;
 }
 
 // virtual
-bool RSA::IsEmpty() const { return (nullptr == m_p_ascKey); }
+bool RSA::IsEmpty() const { return (m_p_ascKey->empty()); }
 
 // virtual
 bool RSA::GetPublicKey(String& strKey) const
 {
-    if (nullptr != m_p_ascKey) {
+    if (false == m_p_ascKey->empty()) {
         strKey.Concatenate(
             "-----BEGIN PUBLIC KEY-----\n"  // UN-ESCAPED VERSION
             "%s"
             "-----END PUBLIC KEY-----\n",
             m_p_ascKey->Get());
         return true;
-    } else
+    } else {
         otErr << "RSA::GetPublicKey: Error: no "
                  "public key.\n";
+    }
 
     return false;
 }
@@ -174,11 +171,6 @@ bool RSA::SetPublicKey(const String& strKey)
     Release();
     m_bIsPublicKey = true;
     m_bIsPrivateKey = false;
-
-    if (nullptr == m_p_ascKey) {
-        m_p_ascKey = new Armored;
-        OT_ASSERT(nullptr != m_p_ascKey);
-    }
 
     // This reads the string into the Armor and removes the bookends. (-----
     // BEGIN ...)
@@ -445,7 +437,6 @@ bool RSA::ReEncryptPrivateKey(
     const OTPassword& theExportPassword,
     bool bImporting) const
 {
-    OT_ASSERT(m_p_ascKey != nullptr);
     OT_ASSERT(IsPrivate());
 
     bool bReturnVal = false;
@@ -774,9 +765,7 @@ std::shared_ptr<proto::AsymmetricKey> RSA::Serialize() const
 
 {
     std::shared_ptr<proto::AsymmetricKey> serializedKey = ot_super::Serialize();
-
     auto dataKey = Data::Factory();
-    OT_ASSERT(m_p_ascKey);
     m_p_ascKey->GetData(dataKey);
 
     if (IsPrivate()) {
@@ -795,8 +784,6 @@ bool RSA::TransportKey(
     [[maybe_unused]] OTPassword& privateKey) const
 {
 #if OT_CRYPTO_SUPPORTED_KEY_ED25519
-    OT_ASSERT(nullptr != m_p_ascKey);
-
     if (!IsPrivate()) { return false; }
 
     auto key = Data::Factory();
@@ -817,14 +804,8 @@ bool RSA::TransportKey(
 
 RSA::~RSA()
 {
-    // Release the ascii-armored version of the key (safe to store in this
-    // form.)
-    //
-    if (nullptr != m_p_ascKey) delete m_p_ascKey;
-    m_p_ascKey = nullptr;
-
+    m_p_ascKey->Release();
     Release_AsymmetricKey_OpenSSL();
-
     ReleaseKeyLowLevel_Hook();
 
     if (nullptr != dp->m_pX509)  // Todo: figure out if I should put a copy of

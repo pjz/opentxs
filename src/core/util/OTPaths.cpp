@@ -486,9 +486,9 @@ bool OTPaths::LoadSetScriptsFolder    // ie. PrefixFolder() + [ if (NOT Android)
             AppendFolder(
                 strAppBinaryScriptPath, AppBinaryFolder(), strConfigFolder);
             if (!OTPaths::FolderExists(strAppBinaryScriptPath)) {
-                otOut << __FUNCTION__
-                      << ": Warning: Cannot Find: " << strAppBinaryScriptPath
-                      << ", using default!";
+                LogNormal(OT_METHOD)(__FUNCTION__)(": Warning: Cannot Find: ")(
+                    strAppBinaryScriptPath)(", using default!")
+                    .Flush();
                 strAppBinaryScriptPath =
                     String::Factory();  // don't have anything here.
             }
@@ -918,14 +918,18 @@ bool OTPaths::ToReal(const String& strExactPath, String& out_strCanonicalPath)
     if (actualpath == NULL) {
 
         if (errno == ENOTDIR) {
-            otWarn << "Input value to RealPath is not a directory: (Realpath: "
-                      "skipping)\n";
+            LogDetail(OT_METHOD)(__FUNCTION__)(
+                ": Input value to RealPath is not a directory: (Realpath: "
+                "skipping)")
+                .Flush();
             out_strCanonicalPath.Set(strExactPath);
             return true;
         }
 
         if (errno == ENOENT) {
-            otWarn << "File doesn't exist: (Realpath: skipping)\n";
+            LogDetail(OT_METHOD)(__FUNCTION__)(
+                ": File doesn't exist: (Realpath: skipping)")
+                .Flush();
             out_strCanonicalPath.Set(strExactPath);
             return true;
         }
@@ -1241,8 +1245,9 @@ bool OTPaths::BuildFilePath(
         if (!ConfirmCreateFolder(strPathPart, l_FolderExists, l_bBuiltFolder))
             return false;
         if (bLog && l_bBuiltFolder)
-            otOut << __FUNCTION__ << ": Made new folder: " << l_strPathPart
-                  << "";
+            LogNormal(OT_METHOD)(__FUNCTION__)(": Made new folder: ")(
+                l_strPathPart)(".")
+                .Flush();
 
         if (!out_bFolderCreated && l_bBuiltFolder) out_bFolderCreated = true;
     }

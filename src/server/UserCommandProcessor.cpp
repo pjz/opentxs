@@ -155,12 +155,12 @@ UserCommandProcessor::FinalizeResponse::~FinalizeResponse()
     }
 
     reply_.SetPayload(String::Factory(ledger_));
-    otWarn << OT_METHOD << __FUNCTION__ << ": "
-           << reply_.Context().AvailableNumbers() << " numbers available."
-           << std::endl;
-    otWarn << OT_METHOD << __FUNCTION__ << ": "
-           << reply_.Context().IssuedNumbers({}) << " numbers issued."
-           << std::endl;
+    LogDetail(OT_METHOD)(__FUNCTION__)(": ")(
+        reply_.Context().AvailableNumbers())(" numbers available.")
+        .Flush();
+    LogDetail(OT_METHOD)(__FUNCTION__)(": ")(
+        reply_.Context().IssuedNumbers({}))(" numbers issued.")
+        .Flush();
 }
 
 UserCommandProcessor::UserCommandProcessor(
@@ -1431,8 +1431,6 @@ bool UserCommandProcessor::cmd_notarize_transaction(ReplyMessage& reply) const
         if (nullptr == transaction) {
             otErr << OT_METHOD << __FUNCTION__ << ": Invalid input ledger."
                   << std::endl;
-
-            OT_FAIL;
         }
 
         const auto inputNumber = transaction->GetTransactionNum();

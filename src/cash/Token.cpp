@@ -27,7 +27,7 @@
 #include "opentxs/core/Log.hpp"
 #include "opentxs/core/Nym.hpp"
 #include "opentxs/core/OTStorage.hpp"
-#include "opentxs/core/OTStringXML.hpp"
+#include "opentxs/core/StringXML.hpp"
 #include "opentxs/core/String.hpp"
 
 #include <irrxml/irrXML.hpp>
@@ -181,29 +181,8 @@ void Token::Release()
 
 void Token::ReleasePrototokens()
 {
-    for (auto& it : m_mapPublic) {
-        Armored* pPrototoken = it.second;
-        OT_ASSERT_MSG(
-            nullptr != pPrototoken,
-            "nullptr Armored pointer in Token::ReleasePrototokens.");
-
-        delete pPrototoken;
-        pPrototoken = nullptr;
-    }
-
-    for (auto& it : m_mapPrivate) {
-        Armored* pPrototoken = it.second;
-        OT_ASSERT_MSG(
-            nullptr != pPrototoken,
-            "nullptr Armored pointer in Token::ReleasePrototokens.");
-
-        delete pPrototoken;
-        pPrototoken = nullptr;
-    }
-
     m_mapPublic.clear();
     m_mapPrivate.clear();
-
     m_nTokenCount = 0;
 }
 
@@ -246,9 +225,10 @@ bool Token::IsTokenAlreadySpent(String& theCleartextToken)
         "");
 
     if (bTokenIsPresent) {
-        otOut << "\nToken::IsTokenAlreadySpent: Token was already spent: "
-              << OTFolders::Spent() << Log::PathSeparator() << strAssetFolder
-              << Log::PathSeparator() << strTokenHash << "\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Token was already spent: ")(
+            OTFolders::Spent())(Log::PathSeparator())(strAssetFolder)(
+            Log::PathSeparator())(strTokenHash)
+            .Flush();
         return true;  // all errors must return true in this function.
                       // But this is not an error. Token really WAS already
     }                 // spent, and this true is for real. The others are just
@@ -350,7 +330,7 @@ bool Token::RecordTokenAsSpent(String& theCleartextToken)
 // thePassword);
 
 // OTNym_or_SymmetricKey:
-// const OTPseudonym    * GetNym()      const { return m_pNym;      }
+// const Nym    * GetNym()      const { return m_pNym;      }
 // const crypto::key::LegacySymmetric * GetKey()      const { return m_pKey; }
 // const OTPassword     * GetPassword() const { return m_pPassword; } // for
 // symmetric key (optional)
@@ -478,7 +458,7 @@ void Token::UpdateContents()
     }
 
     // I release this because I'm about to repopulate it.
-    m_xmlUnsigned.Release();
+    m_xmlUnsigned->Release();
 
     Tag tag("token");
 
@@ -514,10 +494,8 @@ void Token::UpdateContents()
         tagProtoPurse->add_attribute("count", formatInt(m_nTokenCount));
         tagProtoPurse->add_attribute("chosenIndex", formatInt(m_nChosenIndex));
 
-        for (auto& it : m_mapPublic) {
-            Armored* pPrototoken = it.second;
-            OT_ASSERT(nullptr != pPrototoken);
-            tagProtoPurse->add_tag("prototoken", pPrototoken->Get());
+        for (auto& protoToken : m_mapPublic) {
+            tagProtoPurse->add_tag("prototoken", protoToken.second->Get());
         }
 
         tag.add_tag(tagProtoPurse);
@@ -528,11 +506,9 @@ void Token::UpdateContents()
 
         TagPtr tagPrivateProtoPurse(new Tag("privateProtopurse"));
 
-        for (auto& it : m_mapPrivate) {
-            Armored* pPrototoken = it.second;
-            OT_ASSERT(nullptr != pPrototoken);
+        for (auto& protoToken : m_mapPrivate) {
             tagPrivateProtoPurse->add_tag(
-                "privatePrototoken", pPrototoken->Get());
+                "privatePrototoken", protoToken.second->Get());
         }
         tag.add_tag(tagPrivateProtoPurse);
     }
@@ -540,7 +516,7 @@ void Token::UpdateContents()
     std::string str_result;
     tag.output(str_result);
 
-    m_xmlUnsigned.Concatenate("%s", str_result.c_str());
+    m_xmlUnsigned->Concatenate("%s", str_result.c_str());
 }
 
 // return -1 if error, 0 if nothing, and 1 if the node was processed.
@@ -638,20 +614,17 @@ std::int32_t Token::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
 
         return 1;
     } else if (strNodeName->Compare("prototoken")) {
-        Armored* pArmoredPrototoken = new Armored;
-        OT_ASSERT(nullptr != pArmoredPrototoken);
+        auto pArmoredPrototoken = Armored::Factory();
 
-        if (!Contract::LoadEncodedTextField(xml, *pArmoredPrototoken) ||
+        if (!Contract::LoadEncodedTextField(xml, pArmoredPrototoken) ||
             !pArmoredPrototoken->Exists()) {
             otErr << "Error in Token::ProcessXMLNode: prototoken field "
                      "without value.\n";
 
-            delete pArmoredPrototoken;
-            pArmoredPrototoken = nullptr;
-
             return (-1);  // error condition
         } else {
-            m_mapPublic[nPublicTokenCount] = pArmoredPrototoken;
+            m_mapPublic.emplace(
+                nPublicTokenCount, std::move(pArmoredPrototoken));
             nPublicTokenCount++;
         }
 
@@ -661,20 +634,17 @@ std::int32_t Token::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
 
         return 1;
     } else if (strNodeName->Compare("privatePrototoken")) {
-        Armored* pArmoredPrototoken = new Armored;
-        OT_ASSERT(nullptr != pArmoredPrototoken);
+        auto pArmoredPrototoken = Armored::Factory();
 
-        if (!Contract::LoadEncodedTextField(xml, *pArmoredPrototoken) ||
+        if (!Contract::LoadEncodedTextField(xml, pArmoredPrototoken) ||
             !pArmoredPrototoken->Exists()) {
             otErr << "Error in Token::ProcessXMLNode: privatePrototoken "
                      "field without value.\n";
 
-            delete pArmoredPrototoken;
-            pArmoredPrototoken = nullptr;
-
             return (-1);  // error condition
         } else {
-            m_mapPrivate[nPrivateTokenCount] = pArmoredPrototoken;
+            m_mapPrivate.emplace(
+                nPrivateTokenCount, std::move(pArmoredPrototoken));
             nPrivateTokenCount++;
             LogTrace(OT_METHOD)(__FUNCTION__)(
                 ": Loaded prototoken and adding to m_mapPrivate at index: ")(
@@ -694,19 +664,14 @@ bool Token::GetPrototoken(Armored& ascPrototoken, std::int32_t nTokenIndex)
     // thus if attempted index is equal or larger to the count, out of bounds.
     if (nTokenIndex >= m_nTokenCount) { return false; }
 
-    for (auto& it : m_mapPublic) {
-        Armored* pPrototoken = it.second;
-        OT_ASSERT(nullptr != pPrototoken);
+    try {
+        ascPrototoken.Set(m_mapPublic.at(nTokenIndex));
 
-        const bool bSuccess = (nTokenIndex == it.first);
+        return true;
+    } catch (...) {
 
-        if (bSuccess) {
-            ascPrototoken.Set(*pPrototoken);
-
-            return true;
-        }
+        return false;
     }
-    return false;
 }
 
 bool Token::GetPrivatePrototoken(
@@ -717,18 +682,14 @@ bool Token::GetPrivatePrototoken(
     // thus if attempted index is equal or larger to the count, out of bounds.
     if (nTokenIndex >= m_nTokenCount) { return false; }
 
-    for (auto& it : m_mapPrivate) {
-        Armored* pPrototoken = it.second;
-        OT_ASSERT(nullptr != pPrototoken);
+    try {
+        ascPrototoken.Set(m_mapPrivate.at(nTokenIndex));
 
-        bool bSuccess = (nTokenIndex == it.first);
+        return true;
+    } catch (...) {
 
-        if (bSuccess) {
-            ascPrototoken.Set(*pPrototoken);
-            return true;
-        }
+        return false;
     }
-    return false;
 }
 
 inline bool Token::ChooseIndex(const std::int32_t nIndex)
@@ -823,8 +784,10 @@ bool Token::VerifyToken(Nym& theNotary, Mint& theMint)
         // BEFORE checking the date.
         m_VALID_FROM != theMint.GetValidFrom() ||
         m_VALID_TO != theMint.GetValidTo()) {
-        otOut << "Token series information doesn't match Mint series "
-                 "information!\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(
+            ": Token series information doesn't match Mint series "
+            "information!")
+            .Flush();
         return false;
     }
 
@@ -834,7 +797,7 @@ bool Token::VerifyToken(Nym& theNotary, Mint& theMint)
     // mint of that series above. So now we just make sure that the CURRENT date
     // and time is within the range described on the token.
     if (!VerifyCurrentDate()) {
-        otOut << "Token is expired!\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Token is expired!").Flush();
         return false;
     }
 
@@ -845,10 +808,10 @@ bool Token::VerifyToken(Nym& theNotary, Mint& theMint)
             GetDenomination()))  // Here's the boolean output:
                                  // coin is verified!
     {
-        otOut << "Token verified!\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Token verified!").Flush();
         return true;
     } else {
-        otOut << "Bad coin!\n";
+        LogNormal(OT_METHOD)(__FUNCTION__)(": Bad coin!").Flush();
         return false;
     }
 }
