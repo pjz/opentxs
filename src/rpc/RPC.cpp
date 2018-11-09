@@ -559,12 +559,27 @@ proto::RPCResponse RPC::create_nym(const proto::RPCCommand& command) const
 
     if (!is_session_valid(command.session())) {
         add_output_status(output, proto::RPCRESPONSE_BAD_SESSION);
+
         return output;
     }
 
-    auto& session = get_session(command.session());
+    if (!is_client_session(command.session())) {
+        add_output_status(output, proto::RPCRESPONSE_BAD_SESSION);
+
+        return output;
+    }
+
+    auto* session = get_client(command.session());
+
+    if (nullptr == session) {
+        add_output_status(output, proto::RPCRESPONSE_ERROR);
+
+        return output;
+    }
+
+    const auto& client = *session;
     const auto& createnym = command.createnym();
-    auto identifier = session.Wallet().CreateNymHD(
+    auto identifier = client.Exec().CreateNymHD(
         createnym.type(),
         createnym.name(),
         createnym.seedid(),
@@ -575,7 +590,7 @@ proto::RPCResponse RPC::create_nym(const proto::RPCCommand& command) const
     } else {
         if (0 < createnym.claims_size()) {
             auto nymdata =
-                session.Wallet().mutable_Nym(Identifier::Factory(identifier));
+                client.Wallet().mutable_Nym(Identifier::Factory(identifier));
 
             for (const auto& addclaim : createnym.claims()) {
                 const auto& contactitem = addclaim.item();
@@ -847,16 +862,13 @@ ArgList RPC::get_args(const Args& serialized)
 
 const api::client::Manager* RPC::get_client(const std::int32_t instance) const
 {
-    auto is_server = 1 == (instance % 2);
-
-    if (is_server) {
+    if (is_server_session(instance)) {
         LogOutput(OT_METHOD)(__FUNCTION__)(": Error: provided instance ")(
             instance)(" is a server session.")
             .Flush();
 
         return nullptr;
     } else {
-
         try {
             return &ot_.Client(get_index(instance));
         } catch (...) {
@@ -1099,6 +1111,59 @@ proto::RPCResponse RPC::get_seeds(const proto::RPCCommand& command) const
     return output;
 }
 
+const api::server::Manager* RPC::get_server(const std::int32_t instance) const
+{
+    if (is_client_session(instance)) {
+        LogOutput(OT_METHOD)(__FUNCTION__)(": Error: provided instance ")(
+            instance)(" is a client session.")
+            .Flush();
+
+        return nullptr;
+    } else {
+        try {
+            return &ot_.Server(get_index(instance));
+        } catch (...) {
+            LogOutput(OT_METHOD)(__FUNCTION__)(": Error: provided instance ")(
+                instance)(" is not a valid server session.")
+                .Flush();
+
+            return nullptr;
+        }
+    }
+}
+
+proto::RPCResponse RPC::get_server_admin_nym(
+    const proto::RPCCommand& command) const
+{
+    auto output = init(command);
+
+    if (false == is_server_session(command.session())) {
+        add_output_status(output, proto::RPCRESPONSE_BAD_SESSION);
+
+        return output;
+    }
+
+    auto pSession = get_server(command.session());
+
+    if (nullptr == pSession) {
+        add_output_status(output, proto::RPCRESPONSE_BAD_SESSION);
+
+        return output;
+    }
+
+    const auto& session = *pSession;
+    const auto password = session.GetAdminNym();
+
+    if (password.empty()) {
+        add_output_status(output, proto::RPCRESPONSE_NONE);
+    } else {
+        output.add_identifier(password);
+        add_output_status(output, proto::RPCRESPONSE_SUCCESS);
+    }
+
+    return output;
+}
+
 proto::RPCResponse RPC::get_server_contracts(
     const proto::RPCCommand& command) const
 {
@@ -1132,11 +1197,41 @@ proto::RPCResponse RPC::get_server_contracts(
     return output;
 }
 
+proto::RPCResponse RPC::get_server_password(
+    const proto::RPCCommand& command) const
+{
+    auto output = init(command);
+
+    if (false == is_server_session(command.session())) {
+        add_output_status(output, proto::RPCRESPONSE_BAD_SESSION);
+
+        return output;
+    }
+
+    auto pSession = get_server(command.session());
+
+    if (nullptr == pSession) {
+        add_output_status(output, proto::RPCRESPONSE_BAD_SESSION);
+
+        return output;
+    }
+
+    const auto& session = *pSession;
+    const auto password = session.GetAdminPassword();
+
+    if (password.empty()) {
+        add_output_status(output, proto::RPCRESPONSE_NONE);
+    } else {
+        output.add_identifier(password);
+        add_output_status(output, proto::RPCRESPONSE_SUCCESS);
+    }
+
+    return output;
+}
+
 const api::Core& RPC::get_session(const std::int32_t instance) const
 {
-    auto is_server = 1 == (instance % 2);
-
-    if (is_server) {
+    if (is_server_session(instance)) {
         return ot_.Server(get_index(instance));
     } else {
         return ot_.Client(get_index(instance));
@@ -1264,10 +1359,9 @@ bool RPC::is_server_session(std::int32_t instance) const
 
 bool RPC::is_session_valid(std::int32_t instance) const
 {
-    auto is_server = 1 == (instance % 2);
     auto index = get_index(instance);
 
-    if (is_server) {
+    if (is_server_session(instance)) {
         return ot_.Servers() > index;
     } else {
         return ot_.Clients() > index;
@@ -1659,6 +1753,12 @@ proto::RPCResponse RPC::Process(const proto::RPCCommand& command) const
         } break;
         case proto::RPCCOMMAND_GETWORKFLOW: {
             return get_workflow(command);
+        } break;
+        case proto::RPCCOMMAND_GETSERVERPASSWORD: {
+            return get_server_password(command);
+        } break;
+        case proto::RPCCOMMAND_GETADMINNYM: {
+            return get_server_admin_nym(command);
         } break;
         case proto::RPCCOMMAND_ERROR:
         default: {
