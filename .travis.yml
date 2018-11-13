@@ -1,9 +1,9 @@
 language: cpp
 dist: xenial
+before_install:
+  - sudo apt-get update
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
     packages:
       - build-essential 
       - g++-8 
