@@ -1,18 +1,17 @@
 language: cpp
 dist: xenial
+before_install:
+  - echo 'deb http://us.archive.ubuntu.com/ubuntu/ bionic main restricted universe multiverse' | sudo tee -a /etc/apt/sources.list
+  - sudo apt-get update -qq
+  - sudo apt-get -y install build-essential g++-8 gcc-8 cmake
 addons:
   apt:
-    sources:
-      - sourceline: 'deb http://us.archive.ubuntu.com/ubuntu/ bionic main restricted universe multiverse'
     packages:
       - build-essential 
-      - g++-8 
-      - gcc-8 
       - time 
       - xz-utils 
       - ca-certificates 
       - git 
-      - cmake 
       - doxygen 
       - graphviz 
       - liblmdb-dev 
