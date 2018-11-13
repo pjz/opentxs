@@ -7,7 +7,6 @@ before_install:
 addons:
   apt:
     packages:
-      - build-essential 
       - time 
       - xz-utils 
       - ca-certificates 
