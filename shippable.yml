@@ -10,8 +10,8 @@ build:
   pre_ci:
     # cause the docker-tools container to be built
     - ./scripts/build/dtools.sh uptime
+    - cp -r . /tmp/src
   ci:
-    - if [ -d /tmp/shared/scripts ]; then cp -r . /tmp/shared ; fi
     - cd /tmp/src
     - |-
       if ls $DEB >/dev/null 2>&1; then
