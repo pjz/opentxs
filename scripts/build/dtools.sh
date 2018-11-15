@@ -1,4 +1,4 @@
-#!/bin/bash -e -x
+#!/bin/bash -x
 GITREPO=`git rev-parse --show-toplevel`
 if [ `pwd` != ${GITREPO} ]; then
    echo "must run from the top level of the git repo"
@@ -10,6 +10,7 @@ NAME="opentxs_build:${DFILEHASH}"
 if [ `docker images ${NAME} | wc -l` -lt 2 ] ; then
     docker build -f ${DOCKERFILE} -t "${NAME}" `dirname ${DOCKERFILE}`
 fi
+set -e
 #docker run -t -v `pwd`:/src --user $(id -u):$(id -g) "${NAME}" /bin/sh -c "$@"
 # run as root
 #DMOUNT=${DMOUNT:="-v `pwd`:"}
