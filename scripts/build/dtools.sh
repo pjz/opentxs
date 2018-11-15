@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash -e -x
 GITREPO=`git rev-parse --show-toplevel`
 if [ `pwd` != ${GITREPO} ]; then
    echo "must run from the top level of the git repo"
@@ -12,7 +12,9 @@ if [ `docker images ${NAME} | wc -l` -lt 2 ] ; then
 fi
 #docker run -t -v `pwd`:/src --user $(id -u):$(id -g) "${NAME}" /bin/sh -c "$@"
 # run as root
-docker run -v `pwd`:/src "${NAME}" /bin/sh -c "$@"
+#DMOUNT=${DMOUNT:="-v `pwd`:"}
+#docker run --rm ${DMOUNT}/src "${NAME}" /bin/sh -c "$@"
+docker run --rm -v `pwd`:/src "${NAME}" /bin/sh -c "$@"
 OWNER=$(id -u):$(id -g)
 # ..but chown everything back to the user
-docker run -v `pwd`:/src "${NAME}" /bin/sh -c "chown -R ${OWNER} ."
+docker run --rm -v `pwd`:/src "${NAME}" /bin/sh -c "chown -R ${OWNER} ."
