@@ -10,6 +10,7 @@ build:
   pre_ci:
     # cause the docker-tools container to be built
     - ./scripts/build/dtools.sh uptime
+    - cp -r . /tmp/src
   ci:
     - cd /tmp/src
     - |-
