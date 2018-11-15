@@ -1,14 +1,13 @@
 language: c
 
 env:
-  - TARGET=opentxs-proto CMAKE_FLAGS="-DPYTTHON3:BOOL=ON" DIR=deps/opentxsproto/build DEB=no_deb_needed_this_file_doesnt_exist
-  - TARGET=opentxs       CMAKE_FLAGS=""                   DIR=build                   DEB=deps/opentxs-proto/build/opentxs-proto*.deb
+  - TARGET=opentxs-proto CMAKE_FLAGS="-DPYTTHON3:BOOL=ON" DIR=deps/opentxs-proto/build DEB=no_deb_needed_this_file_doesnt_exist
+  - TARGET=opentxs       CMAKE_FLAGS=""                   DIR=build                    DEB=deps/opentxs-proto/build/opentxs-proto*.deb
 
 build:
   pre_ci:
     # cause the docker-tools container to be built
     - ./scripts/build/dtools.sh uptime   
-    - mkdir -p build deps/opentxsproto/build
   ci:
     - |-
       if ls $DEB >/dev/null 2>&1; then
@@ -16,6 +15,7 @@ build:
       else
         INST=""
       fi
+    - mkdir -p $DIR
     - ./scripts/build/dtools.sh "$INST cd $DIR && cmake ${CMAKE_FLAGS} .. && make test"
     - ./scripts/build/dtools.sh "$INST cd $DIR && checkinstall -D --fstrans=yes --install=no --pkgname ${TARGET} --nodoc -y make install"
 
