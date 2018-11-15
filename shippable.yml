@@ -16,6 +16,6 @@ build:
         INST=""
       fi
     - mkdir -p $DIR
-    - ./scripts/build/dtools.sh "$INST cd $DIR && cmake ${CMAKE_FLAGS} .. && make test"
-    - ./scripts/build/dtools.sh "$INST cd $DIR && checkinstall -D --fstrans=yes --install=no --pkgname ${TARGET} --nodoc -y make install"
+    - ./scripts/build/dtools.sh "$INST cd /src/$DIR && cmake ${CMAKE_FLAGS} .. && make test"
+    - ./scripts/build/dtools.sh "$INST cd /src/$DIR && checkinstall -D --fstrans=yes --install=no --pkgname ${TARGET} --nodoc -y make install"
 
